@@ -1,0 +1,158 @@
+﻿<!-- miniapp/index.html (processed as PHP via .htaccess) -->
+<?php
+header('Content-Type: text/html; charset=UTF-8');
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../db.php';
+
+// 1. Grab and sanitize the incoming tg_id
+$tg_id = intval($_GET['tg_id'] ?? 0);
+
+// 2. Look up the user; if none, abort with a 400
+$user = getUserByTgId($tg_id);
+
+
+// 3. Now it’s safe to fetch schedule and students
+$schedule = getTodaySchedule($tg_id);
+$students = getGroupStudents($user['group_id']);
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Attendance Journal</title>
+  <style>
+    body {
+      margin:0; padding:10px;
+      font-family:sans-serif;
+      color: var(--tg-theme-text-color);
+      background: var(--tg-theme-bg-color);
+    }
+    table {
+      width:100%;
+      border-collapse:collapse;
+    }
+    th, td {
+      border:1px solid #aaa;
+      padding:8px;
+      text-align:center;
+    }
+    th {
+      background: var(--tg-theme-section-separator-color);
+    }
+    .btn-submit {
+      margin-top:15px;
+      padding:10px 20px;
+      border: 1px;
+      border-radius:5px;
+      background: lightblue;
+      color: var(--tg-theme-button-text-color);
+      font-size:16px;
+      cursor:pointer;
+    }
+    /* toggle switch */
+    .switch {
+      position:relative;
+      display:inline-block;
+      width:50px;
+      height:24px;
+    }
+    .switch input {
+      opacity:0;
+      width:0; height:0;
+    }
+    .slider {
+      position:absolute;
+      cursor:pointer;
+      top:0; left:0; right:0; bottom:0;
+      background-color:#ef5350;
+      transition:.4s;
+      border-radius:24px;
+    }
+    .slider:before {
+      position:absolute;
+      content:"";
+      height:18px; width:18px;
+      left:3px; bottom:3px;
+      background:white;
+      transition:.4s;
+      border-radius:50%;
+    }
+    input:checked + .slider {
+      background-color:#66bb6a;
+    }
+    input:checked + .slider:before {
+      transform:translateX(26px);
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Group: <?= htmlspecialchars($user['group_id'], ENT_QUOTES) ?></h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Student</th>
+        <?php foreach ($schedule as $row): ?>
+          <th>
+            <?= htmlspecialchars($row['time_slot'], ENT_QUOTES) ?><br>
+            <?= htmlspecialchars($row['subject'], ENT_QUOTES) ?>
+          </th>
+        <?php endforeach; ?>
+      </tr>
+    </thead>
+    <tbody>
+ <tbody>
+    <?php foreach ($students as $stu): ?>
+    <tr>
+      <td><?= htmlspecialchars($stu['name'], ENT_QUOTES) ?></td>
+      <?php foreach ($schedule as $row): ?>
+      <td>
+        <label class="switch">
+          <input type="checkbox" id="att_<?= $row['id'] ?>_<?= $stu['id'] ?>">
+          <span class="slider"></span>
+        </label>
+      </td>
+      <?php endforeach; ?>
+    </tr>
+    <?php endforeach; ?>
+  </tbody>
+  </table>
+
+  <button class="btn-submit">Submit Attendance</button>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+  const tg       = window.Telegram.WebApp;
+  const schedule = <?= json_encode($schedule, JSON_UNESCAPED_UNICODE) ?>;
+  const students = <?= json_encode($students, JSON_UNESCAPED_UNICODE) ?>;
+
+  document.querySelector('.btn-submit').addEventListener('click', () => {
+    // 1) confirm
+    if (!confirm('Submit attendance for today?')) return;
+
+    // 2) build payload
+    const payload = { attendance: [] };
+    for (let r of schedule) {
+      for (let s of students) {
+        const chk = document.getElementById(`att_${r.id}_${s.id}`);
+        payload.attendance.push({
+          schedule_id: r.id,
+          user_id:     s.id,
+          present:     !!chk.checked
+        });
+      }
+    }
+
+    // 3) send to the bot
+    tg.sendData(JSON.stringify(payload));
+
+    // 4) user feedback and close
+    tg.showAlert('Attendance saved! ');
+    tg.close();
+  });
+</script>
+
+</body>
+</html>
