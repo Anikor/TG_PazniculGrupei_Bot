@@ -1,4 +1,4 @@
-# AttendanceBot [![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-blue?logo=telegram)](https://t.me/YourBotUsername)
+# AttendanceBot [![Telegram Bot](https://img.shields.io/badge/Telegram-Bot-blue?logo=telegram)](https://t.me/PazniculGrupeiBot)
 
 **AttendanceBot** is a Telegram bot that makes tracking and viewing student attendance a breeze.  
 Group leaders can mark attendance with a tap, view detailed reports, and students can self-check their stats—all without leaving Telegram.
