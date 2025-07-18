@@ -1,0 +1,25 @@
+# ─── IDE / Editor settings ─────────────────────────────────────────────
+.vs/
+.idea/
+*.suo
+*.user
+*.vscode/
+
+# ─── OS clutter ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Dependencies ────────────────────────────────────────────────────
+/node_modules/
+/vendor/
+
+# ─── Environment files ────────────────────────────────────────────────
+.env
+
+# ─── Unused project folders & files ─────────────────────────────────
+ARHIVE/
+bot/
+public/
+Testing/
+bot.php
+index.php
