@@ -24,8 +24,12 @@ Group leaders can mark attendance with a tap, view detailed reports, and student
    ```php
    define('TELEGRAM_TOKEN', 'PASTE_YOUR_TOKEN_HERE');
 
-**HOW TO SET UP NGROK**
 
+## HOW TO SET UP NGROK (To run localy on your PC)
+
+<details>
+<summary>Click to expand (skip if you’ve already done this)</summary>
+   
 ### 1. Prerequisites
 - **XAMPP** Control Panel running:
   - Apache → port 80  
