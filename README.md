@@ -33,8 +33,8 @@ Attendance Controls
 
 - View Group Attendance (full group statistics for Monitors and Admins)
 
-Everything you need—schedule lookup, attendance logging, and analytics—is just one click away.
-
+Everything you need as a Monitor - schedule lookup, attendance logging, and analytics—is automated and just one click away.
+</details>
 
 
 ---
