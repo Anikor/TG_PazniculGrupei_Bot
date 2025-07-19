@@ -84,6 +84,19 @@ This page empowers Monitors, Admins, and Moderators to record and review group a
 ## Audit Trail
 - See which user marked each attendance entry and when, directly in the table.
 
+## Attendance Editing 
+
+  <img width="602" height="353" alt="image" src="https://github.com/user-attachments/assets/f2832153-7671-4061-86ef-5d67be5ada63" />
+
+## Edit Any Entry
+- Monitors, Admins, and Moderators can update attendance toggles or motivation flags after the fact.
+
+## Who & When
+- Each edited cell shows the user’s name and the exact timestamp of the last change.
+
+## Full History
+- Every update is recorded in the database, ensuring a complete, tamper‑proof audit trail.
+
 Everything is laid out in a responsive, dark/light‑theme table for fast, accurate logging and complete accountability.
 
 </details>
