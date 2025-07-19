@@ -48,9 +48,10 @@ You should see your page.
 As Admin in PowerShell:
 Through Chocolatey  `choco install ngrok -y` then run `ngrok http 80`
 
-Chocolatey Installation: Set-ExecutionPolicy Bypass -Scope Process -Force
+Chocolatey Installation: 
+`Set-ExecutionPolicy Bypass -Scope Process -Force
 [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor  3072
-iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))`
 
 
 Or Manually:
