@@ -1,5 +1,9 @@
 ﻿<?php
 // poll.php
+
+  // POINT to greeting.php instead of index.html, no tg_id param
+                    $host   = 'https://93b705d584b1.ngrok-free.app/TG_Bot/miniapp/index.html'; 
+
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -109,8 +113,7 @@ while (true) {
                     break;
 
                 case $text === '/app':
-                    // 🔑 POINT to greeting.php instead of index.html, no tg_id param
-                    $host   = 'https://234ebeb345c8.ngrok-free.app/miniapp/index.html'; 
+                  
                     $url    = $host . '/miniapp/greeting.php';
                     $kbd    = [
                         'inline_keyboard' => [[

@@ -57,15 +57,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
        AND user_id=:uid
     LIMIT 1
   ");
-  $upd = $pdo->prepare("
-    UPDATE attendance
-       SET present=:pres,
-           motivated=:mot,
-           motivation=:reason,
-           updated_at=NOW(),
-           updated_by=:editor
-     WHERE id=:att_id
-  ");
+$upd = $pdo->prepare("
+  UPDATE attendance
+     SET present    = :pres,
+         motivated  = :mot,
+         motivation = :reason,
+         updated_at = NOW(),
+         updated_by = :editor
+   WHERE id         = :att_id
+");
   $log = $pdo->prepare("
     INSERT INTO attendance_log
       (attendance_id, changed_by,
@@ -100,24 +100,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
       $old['motivation'] !== $new_reason
     ) {
       // insert log
-      $log->execute([
-        ':att_id'     => $old['id'],
-        ':editor'     => $user['id'],
-        ':old_pres'   => $old['present'],
-        ':new_pres'   => $new_pres,
-        ':old_mot'    => $old['motivated'],
-        ':new_mot'    => $new_mot,
-        ':old_reason' => $old['motivation'],
-        ':new_reason' => $new_reason
-      ]);
+$log->execute([
+ 'att_id'     => $old['id'],
+  'editor'     => $user['id'],
+  'old_pres'   => $old['present'],
+  'new_pres'   => $new_pres,
+  'old_mot'    => $old['motivated'],
+  'new_mot'    => $new_mot,
+  'old_reason' => $old['motivation'],
+  'new_reason' => $new_reason,
+]);
+
       // update attendance
-      $upd->execute([
-        ':pres'    => $new_pres,
-        ':mot'     => $new_mot,
-        ':reason'  => $new_reason,
-        ':editor'  => $user['id'],
-        ':att_id'  => $old['id']
-      ]);
+$upd->execute([
+'pres'   => $new_pres,
+  'mot'    => $new_mot,
+  'reason' => $new_reason,
+  'editor' => $user['id'],
+  'att_id' => $old['id'],
+]);
     }
   }
 
@@ -144,14 +145,15 @@ if (!empty($schedule)) {
            AND schedule_id IN($in)";
   $stmt = $pdo->prepare($q);
   $stmt->execute(array_merge([$date], $sids));
-  $teacher_ids = $editor_ids = [];
+  $marker_ids = $editor_ids = [];
   while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $existing[$r['schedule_id']][$r['user_id']] = $r;
-    $teacher_ids[] = $r['marked_by'];
+    $marker_ids[] = $r['marked_by'];
     if ($r['updated_by']) $editor_ids[] = $r['updated_by'];
   }
   // load markers
-  $all_ids = array_unique(array_merge($teacher_ids,$editor_ids));
+  $all_ids = array_values(array_unique(array_merge($marker_ids, $editor_ids)));
+
   if ($all_ids) {
     $in2 = implode(',', array_fill(0,count($all_ids),'?'));
     $stm2 = $pdo->prepare("SELECT id,name FROM users WHERE id IN($in2)");
