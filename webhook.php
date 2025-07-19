@@ -2,7 +2,7 @@
 require_once 'bot.php';
 echo 'OK';
 
-<?php
+
 // webhook.php
 
 // 1️⃣ Load config & DB helpers
