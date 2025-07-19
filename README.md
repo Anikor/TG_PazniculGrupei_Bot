@@ -99,6 +99,29 @@ This page empowers Monitors, Admins, and Moderators to record and review group a
 
 Everything is laid out in a responsive, dark/light‑theme table for fast, accurate logging and complete accountability.
 
+## 3. View Group Attendance
+This page provides a high‑level overview of your entire group’s attendance:
+
+<img width="619" height="908" alt="image" src="https://github.com/user-attachments/assets/52495dfa-ea34-4d3b-ba10-9fba855737e8" />
+
+## Group Summary Cards
+### Quick stats for the whole group showing:
+
+- Today, This Week, This Month, and All Time
+
+- Format: Present / Total (S%)
+
+## Per‑Student Breakdown
+### A table listing each student with columns for:
+
+- Today, This Week, Month, All Time – sessions attended / total (%)
+
+## View – button to drill down into that student’s personal attendance page
+
+All percentages are calculated on‑the‑fly, giving you instant insight into who’s on track and who may need follow‑up.
+
+
+
 </details>
 
 
