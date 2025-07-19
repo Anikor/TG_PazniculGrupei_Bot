@@ -23,7 +23,7 @@ Group leaders can mark attendance with a tap, view detailed reports, and student
 6. In your project’s `src/config.php`, set:
    define('TELEGRAM_TOKEN', 'PASTE_YOUR_TOKEN_HERE');
    
-And in poll.php: $host = (https://234yourlink.ngrok-free.app/TG_Bot/miniapp/index.html)
+And in `poll.php`: $host = (https://234yourlink.ngrok-free.app/TG_Bot/miniapp/index.html)
    
 
 
@@ -48,9 +48,9 @@ You should see your page.
 2. Unzip `ngrok.exe` to, e.g., `C:\tools\ngrok\`  
 3. Sign up at https://dashboard.ngrok.com/signup and copy your **authtoken** from “Get Started”  
 4. In PowerShell:
-``powershell
+`
    cd C:\tools\ngrok
-   .\ngrok.exe config add-authtoken YOUR_AUTHTOKEN
+   .\ngrok.exe config add-authtoken YOUR_AUTHTOKEN `
 ### 4. Start the Tunnel
 cd C:\tools\ngrok
 .\ngrok.exe http 80
