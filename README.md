@@ -5,6 +5,40 @@ Group leaders can mark attendance with a tap, view detailed reports, and student
 
 ---
 
+## Features
+
+<details>
+<summary>See the features of @PazniculGrupeibot </summary>
+
+1. Greeting page
+2. 
+The Greeting Page is your bot’s central dashboard, designed for maximum convenience and lightning‑fast access:
+
+<img width="578" height="743" alt="image" src="https://github.com/user-attachments/assets/9942c808-6701-4897-9a0f-4285c5873732" />
+
+Personal Schedule
+Instantly view yesterday’s, today’s, tomorrow’s or this week’s timetable.
+
+Dark/Light Theme
+Toggle between dark and light modes for comfortable viewing in any environment.
+
+User Context
+Displays the student’s name and role (Student, Monitor, Admin, etc.) pulled directly from the database.
+
+Attendance Controls
+
+Log Attendance (for Monitors and Admins)
+
+View My Attendance (individual student history)
+
+View Group Attendance (full group statistics)
+
+Everything you need—schedule lookup, attendance logging, and analytics—is just one click away.
+
+
+
+---
+
 ## Setup Mini App option in BotFather + Ngrok setup for the mini app
 
 <details>
