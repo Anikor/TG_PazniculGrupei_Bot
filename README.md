@@ -10,22 +10,22 @@ Group leaders can mark attendance with a tap, view detailed reports, and student
 <details>
 <summary>See the features of @PazniculGrupeibot </summary>
 
-1. Greeting page
+## 1. Greeting page
    
 The Greeting Page is your bot’s central dashboard, designed for maximum convenience and lightning‑fast access:
 
 <img width="578" height="743" alt="image" src="https://github.com/user-attachments/assets/9942c808-6701-4897-9a0f-4285c5873732" />
 
-Personal Schedule
+ ### Personal Schedule
  - Instantly view yesterday’s, today’s, tomorrow’s or this week’s timetable.
 
-Dark/Light Theme
+### Dark/Light Theme
 - Toggle between dark and light modes for comfortable viewing in any environment.
 
-User Context
+### User Context
 - Displays the student’s name and role (Student, Monitor, Admin, etc.) pulled directly from the database.
 
-Attendance Controls
+### Attendance Controls
 
 - View My Attendance (individual student history)
 
@@ -34,6 +34,58 @@ Attendance Controls
 - View Group Attendance (full group statistics for Monitors and Admins)
 
 Everything you need as a Monitor - schedule lookup, attendance logging, and analytics—is automated and just one click away.
+
+
+## 2. View My Attendance
+
+Each student can view and analyze their own attendance data through:
+
+<img width="1000" height="711" alt="image" src="https://github.com/user-attachments/assets/23bb3ac9-a63b-4481-ac17-1df0d402b3a9" />
+
+## Summary Cards
+### Quick stats for:
+- Today, This Week, This Month, and All Time.
+
+- Shows total sessions, total absences (unmotivated vs. motivated) and absence rate.
+
+- All Time card adds “Lab Misses” count and an Estimated Fee for any missed labs.
+
+## By Subject Absence Rates
+### A table breaking down, for each subject:
+- Lecture, seminar and lab absence counts & percentages
+
+- Overall absence rate per subject
+
+## Detailed Absence Logs
+### Full listings of every absence entry in separate tables for:
+- This Week
+
+- This Month
+
+- All Time
+
+This page gives students both a high‑level snapshot and deep dives into their attendance history—complete with custom lab‑fee estimates for missed practical sessions.
+
+## 3. Log Attendance (For Monitors, Admins & Moderators)
+
+This page empowers Monitors, Admins, and Moderators to record and review group attendance with ease:
+
+<img width="770" height="859" alt="image" src="https://github.com/user-attachments/assets/2ec37d23-6c5e-4a58-a88b-2b16144afa2f" />
+
+## Date Navigation
+- Quickly jump to any past session using the “← 4d”, “← 3d”, “Today”, “→ 1d” buttons, then return to the full schedule.
+
+## Attendance Toggles
+- Each student’s row shows one toggle per time slot—green for present, red for absent.
+
+## Motivation Controls
+- For any absence, check Motivated and enter a custom reason (e.g. “Being late”, “Feels sick”).
+
+## Audit Trail
+- See which user marked each attendance entry and when, directly in the table.
+
+Everything is laid out in a responsive, dark/light‑theme table for fast, accurate logging and complete accountability.
+
 </details>
 
 
