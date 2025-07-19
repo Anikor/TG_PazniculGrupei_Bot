@@ -44,8 +44,17 @@ Open in your browser:  http://localhost/TG_Bot
 You should see your page.
 
 ### 3. Install & Authenticate ngrok
-1. Download ngrok for Windows: https://ngrok.com/download or better through Chocolatey  `choco install ngrok -y` then run `ngrok http 80`
 
+As Admin in PowerShell:
+Through Chocolatey  `choco install ngrok -y` then run `ngrok http 80`
+
+Chocolatey Installation: Set-ExecutionPolicy Bypass -Scope Process -Force
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor  3072
+iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+
+
+Or Manually:
+1. Download ngrok: https://ngrok.com/download
 2. Unzip `ngrok.exe` to, e.g., `C:\tools\ngrok\`  
 3. Sign up at https://dashboard.ngrok.com/signup and copy your **authtoken** from “Get Started”  
 4. In PowerShell:
