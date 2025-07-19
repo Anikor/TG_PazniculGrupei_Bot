@@ -5,7 +5,7 @@ Group leaders can mark attendance with a tap, view detailed reports, and student
 
 ---
 
-## Setup Mini App option in BotFather
+## Setup Mini App option in BotFather + Ngrok setup for the mini app
 
 <details>
 <summary>Click to expand (skip if you’ve already done this)</summary>
@@ -18,7 +18,7 @@ Group leaders can mark attendance with a tap, view detailed reports, and student
 4. Set your bot:
    1. Send `/mybots`, then follow than choose:
    2. Bot Settings -> Configure Mini App -> Enable Mini App
-   3. Send to bot your https link, since i run my bot localy on PC i'll use ngrok (See below) (https://234yourlink.ngrok-free.app/TG_Bot/miniapp/greeting.php)
+   3. Send to bot your https link, since i run my bot localy on PC i'll use ngrok (See how to setup below) (https://234yourlink.ngrok-free.app/TG_Bot/miniapp/greeting.php)
 
 6. In your project’s `src/config.php`, set:
    define('TELEGRAM_TOKEN', 'PASTE_YOUR_TOKEN_HERE');
@@ -33,7 +33,7 @@ And in `poll.php`: $host = (https://234yourlink.ngrok-free.app/TG_Bot/miniapp/in
 <summary>Click to expand (skip if you’ve already done this)</summary>
    
 ### 1. Prerequisites
-- **XAMPP** Control Panel running:
+- **XAMPP** Control Panel installed and running:
   - Apache → port 80  
   - MySQL → port 3306  
 - Your bot’s code in `C:\xampp\htdocs\TG_Bot`
@@ -63,15 +63,15 @@ Or Manually:
    cd C:\tools\ngrok
    .\ngrok.exe config add-authtoken YOUR_AUTHTOKEN `
 ### 4. Start the Tunnel
-cd C:\tools\ngrok
-.\ngrok.exe http 80
+` cd C:\tools\ngrok
+.\ngrok.exe http 80 `
 Copy the Forwarding URL (e.g. https://abcd1234.ngrok-free.app).
 
 ### 5. Set Your Telegram Webhook
 Invoke-WebRequest "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=<NGROK_URL>/TG_Bot/webhook.php"
 
 ### 6. Test
-Send /start to your bot; it should reply.
+Send `/start` to your bot; it should reply.
 View live HTTP logs at: http://127.0.0.1:4040/inspect/http
 
 
