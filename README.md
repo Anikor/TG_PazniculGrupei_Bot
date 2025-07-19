@@ -116,7 +116,7 @@ This page provides a high‑level overview of your entire group’s attendance:
 
 - Today, This Week, Month, All Time – sessions attended / total (%)
 
-## View – button to drill down into that student’s personal attendance page
+### View – button to drill down into that student’s personal attendance page
 
 All percentages are calculated on‑the‑fly, giving you instant insight into who’s on track and who may need follow‑up.
 
