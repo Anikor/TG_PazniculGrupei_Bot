@@ -1,8 +1,8 @@
 -- 1) Create database
-CREATE DATABASE IF NOT EXISTS `attendence_utm`
+CREATE DATABASE IF NOT EXISTS `attendance_utm`
   CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_general_ci;
-USE `attendence_utm`;
+USE `attendance_utm`;
 
 -- 2) Groups
 CREATE TABLE `groups` (

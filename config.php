@@ -1,7 +1,7 @@
 <?php
 
 $host = '127.0.0.1';
-$db   = 'attendence_utm';
+$db   = 'attendance_utm';
 $user = 'root';
 $pass = '';       
 $opts = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
