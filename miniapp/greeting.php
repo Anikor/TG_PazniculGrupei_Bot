@@ -2,7 +2,7 @@
 // miniapp/greeting.php
 
 // ————————————————————————————————————————————————
-// 1️⃣ Bootstrap for Telegram Web App (no ?tg_id=… yet)
+// 1 Bootstrap for Telegram Web App (no ?tg_id=… yet)
 // ————————————————————————————————————————————————
 if (!isset($_GET['tg_id'])): ?>
 <!DOCTYPE html>
@@ -36,7 +36,7 @@ if (!isset($_GET['tg_id'])): ?>
 endif;
 
 // ————————————————————————————————————————————————
-// 2️⃣ Main greeting page (we now have ?tg_id=…)
+// 2 Main greeting page (we now have ?tg_id=…)
 // ————————————————————————————————————————————————
 header('Content-Type: text/html; charset=UTF-8');
 require_once __DIR__ . '/../config.php';
@@ -306,6 +306,7 @@ if ($when === 'week') {
   >
     👥 View Group Attendance
   </a>
+  
 <?php endif; ?>
 
 <?php if ($user['role'] === 'admin'): ?>
@@ -318,17 +319,23 @@ if ($when === 'week') {
     <a href="greeting.php?tg_id=878801928" class="btn btn-secondary">
       Secondary
     </a>
+<?php endif; ?>
+<?php if (in_array($user['role'], ['admin','monitor'], true)): ?>
+      <a href="export.php?tg_id=<?= $tg_id ?>&group_id=<?= $user['group_id'] ?>" class="btn btn-primary">
+        📥 Export Attendance
+      </a>
+
   </div>
 <?php endif; ?>
 
   </div>
 
   <script>
-  // 1️ Grab toggle & label
+  // 1 Grab toggle & label
   const toggle = document.getElementById('theme-toggle');
   const label  = document.getElementById('theme-label');
 
-  // 2️ Initialize from localStorage (default = light)
+  // 2 Initialize from localStorage (default = light)
   const saved = localStorage.getItem('theme') || 'light';
   if (saved === 'dark') {
     document.body.classList.add('dark-theme');
@@ -336,7 +343,7 @@ if ($when === 'week') {
     label.textContent = 'Dark';
   }
 
-  // 3️ On toggle → switch class & save
+  // 3 On toggle → switch class & save
   toggle.addEventListener('change', () => {
     if (toggle.checked) {
       document.body.classList.add('dark-theme');
