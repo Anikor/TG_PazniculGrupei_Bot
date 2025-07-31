@@ -41,6 +41,7 @@ endif;
 header('Content-Type: text/html; charset=UTF-8');
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/oe_weeks.php';
 
 // Identify user
 $tg_id = intval($_GET['tg_id']);
@@ -49,6 +50,9 @@ if (!$user) {
     http_response_code(400);
     exit('Error: invalid or unregistered Telegram ID');
 }
+
+$weekType = getCurrentWeekType();         // 'odd' or 'even'
+$subgroup = $user['subgroup'] ?? null;            // 1, 2 or NULL
 
 // 2) allow admin to override which group we’re viewing
 if ($user['role'] === 'admin' && isset($_GET['group_id'])) {

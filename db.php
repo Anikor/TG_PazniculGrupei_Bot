@@ -11,14 +11,13 @@ require_once __DIR__ . '/config.php';
 function getUserByTgId(int $tg_id): ?array {
     global $pdo;
     $stmt = $pdo->prepare(
-        "SELECT id, tg_id, name, role, group_id
+        "SELECT id, tg_id, name, role, group_id, subgroup
            FROM users
           WHERE tg_id = ?"
     );
     $stmt->execute([$tg_id]);
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
-
 
 /**
  * Get schedule rows for today, based on user's group
@@ -129,18 +128,20 @@ function getUserStats(int $tg_id): ?array {
 }
 
 /**
- * Get schedule rows for a specific date
+ * Get schedule rows for a specific date, filtering odd/even weeks and subgroup.
  *
- * @param  int    $tg_id
- * @param  string $date    'YYYY-MM-DD'
- * @return array
+ * @param  int         $tg_id      Telegram user ID
+ * @param  string      $date       Date in 'YYYY-MM-DD' format
+ * @param  string|null $weekType   'odd' or 'even' (NULL = every week)
+ * @param  int|null    $subgroup   1 or 2 (NULL = all students)
+ * @return array                   Array of schedule rows
  */
-function getScheduleForDate(int $tg_id, string $date): array {
+function getScheduleForDate(int $tg_id, string $date, ?string $weekType = null, ?int $subgroup = null): array {
     global $pdo;
     $dayName = date('l', strtotime($date)); // e.g. "Tuesday"
 
-    $stmt = $pdo->prepare(
-        "SELECT 
+    $sql = "
+        SELECT
             s.day_of_week,
             s.id,
             s.group_id,
@@ -148,26 +149,39 @@ function getScheduleForDate(int $tg_id, string $date): array {
             s.type,
             s.subject,
             s.location
-         FROM schedule s
-         JOIN users u ON u.group_id = s.group_id
-         WHERE u.tg_id = ? 
-           AND s.day_of_week = ?
-         ORDER BY s.time_slot"
-    );
-    $stmt->execute([$tg_id, $dayName]);
+        FROM schedule s
+        JOIN users u ON u.group_id = s.group_id
+        WHERE u.tg_id        = :tg_id
+          AND s.day_of_week  = :dayName
+          AND (s.week_type IS NULL OR s.week_type = :weekType)
+          AND (s.subgroup  IS NULL OR s.subgroup  = :subgroup)
+        ORDER BY STR_TO_DATE(SUBSTRING_INDEX(s.time_slot,'-',1), '%H:%i')
+    ";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':tg_id'     => $tg_id,
+        ':dayName'   => $dayName,
+        ':weekType'  => $weekType,
+        ':subgroup'  => $subgroup
+    ]);
+
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
 /**
- * Get this week's schedule (Monday–Friday)
+ * Get this week's schedule (Monday–Friday), filtering odd/even weeks and subgroup.
  *
- * @param  int  $tg_id
- * @return array
+ * @param  int         $tg_id      Telegram user ID
+ * @param  string|null $weekType   'odd' or 'even' (NULL = every week)
+ * @param  int|null    $subgroup   1 or 2 (NULL = all students)
+ * @return array                   Array of schedule rows
  */
-function getWeekSchedule(int $tg_id): array {
+function getWeekSchedule(int $tg_id, ?string $weekType = null, ?int $subgroup = null): array {
     global $pdo;
-    $stmt = $pdo->prepare(
-        "SELECT 
+
+    $sql = "
+        SELECT
             s.day_of_week,
             s.id,
             s.group_id,
@@ -175,14 +189,23 @@ function getWeekSchedule(int $tg_id): array {
             s.type,
             s.subject,
             s.location
-         FROM schedule s
-         JOIN users u ON u.group_id = s.group_id
-         WHERE u.tg_id = ?
-           AND s.day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')
-         ORDER BY 
-           FIELD(s.day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday'),
-           s.time_slot"
-    );
-    $stmt->execute([$tg_id]);
+        FROM schedule s
+        JOIN users u ON u.group_id = s.group_id
+        WHERE u.tg_id        = :tg_id
+          AND s.day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')
+          AND (s.week_type IS NULL OR s.week_type = :weekType)
+          AND (s.subgroup  IS NULL OR s.subgroup  = :subgroup)
+        ORDER BY
+            FIELD(s.day_of_week, 'Monday','Tuesday','Wednesday','Thursday','Friday'),
+            STR_TO_DATE(SUBSTRING_INDEX(s.time_slot,'-',1), '%H:%i')
+    ";
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        ':tg_id'     => $tg_id,
+        ':weekType'  => $weekType,
+        ':subgroup'  => $subgroup
+    ]);
+
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
