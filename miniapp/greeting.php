@@ -308,7 +308,10 @@ if ($when === 'week') {
   </a>
   
 <?php endif; ?>
-
+<?php if (in_array($user['role'], ['admin','monitor'], true)): ?>
+      <a href="export.php?tg_id=<?= $tg_id ?>&group_id=<?= $user['group_id'] ?>" class="btn btn-primary">
+        📥 Export Attendance
+      </a>
 <?php if ($user['role'] === 'admin'): ?>
   <div class="btn-group" role="group" aria-label="Admin switch">
     <!-- Primary: log in as Karina in AI‑241 -->
@@ -320,10 +323,7 @@ if ($when === 'week') {
       Secondary
     </a>
 <?php endif; ?>
-<?php if (in_array($user['role'], ['admin','monitor'], true)): ?>
-      <a href="export.php?tg_id=<?= $tg_id ?>&group_id=<?= $user['group_id'] ?>" class="btn btn-primary">
-        📥 Export Attendance
-      </a>
+
 
   </div>
 <?php endif; ?>
