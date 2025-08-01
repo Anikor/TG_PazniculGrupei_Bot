@@ -204,6 +204,39 @@ th, td {
       background: var(--sec-bg);
     }
 
+    /* full-width cells, colored per week_type */
+td.week-cell {
+  border-radius: 4px;
+}
+td.week-cell.even {
+  background: var(--even-bg);
+  color:      var(--even-fg);
+}
+td.week-cell.odd {
+  background: var(--odd-bg);
+  color:      var(--odd-fg);
+}
+
+/* 1. Force the table to distribute column-widths evenly */
+.schedule-table {
+  width: 100%;
+  table-layout: fixed;       /* each column gets an equal share of the total width */
+  border-collapse: collapse; /* collapse the borders for a clean look */
+}
+
+/* 2. Make every cell identical in width & height, and center text */
+.schedule-table th,
+.schedule-table td {
+  width: 16.66%;              /* 100% ÷ 6 columns = 16.66% each */
+  height: 90px;               /* pick a height that fits your content */
+  text-align: center;         /* horizontal centering */
+  vertical-align: middle;     /* vertical centering */
+  padding: 8px;               /* a little breathing room */
+  overflow: hidden;           /* prevent overflow from breaking the layout */
+  box-sizing: border-box;     /* include padding/border in the height/width */
+}
+
+
     /* Legend pills */
     .week-type {
       display: inline-block;
@@ -294,57 +327,122 @@ th, td {
             <?php endforeach; ?>
           </tr>
         </thead>
-        <tbody>
-          <?php foreach ($timeSlots as $slotTime): ?>
-            <tr>
-              <th><?= htmlspecialchars($slotTime, ENT_QUOTES) ?></th>
-              <?php foreach ($dayLabels as $day): ?>
-                <?php
-                  $cells = $grid[$slotTime][$day] ?? [];
-                  $hasOdd = $hasEven = false;
-                  foreach ($cells as $c) {
-                    if ($c['week_type'] === 'odd')  $hasOdd  = true;
-                    if ($c['week_type'] === 'even') $hasEven = true;
-                  }
-                  $split = $hasOdd && $hasEven;
-                ?>
-                <?php if ($split): ?>
-                  <td class="split-cell">
-                    <div class="top week-cell odd">
-                      <?php foreach ($cells as $c): if ($c['week_type'] === 'odd'): ?>
-                        <?= htmlspecialchars($c['type'], ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'], ENT_QUOTES) ?><br>
-                        <?php if ($c['location']): ?>
-                          <small><?= htmlspecialchars($c['location'], ENT_QUOTES) ?></small><br>
-                        <?php endif; ?>
-                      <?php endif; endforeach; ?>
-                    </div>
-                    <div class="bottom week-cell even">
-                      <?php foreach ($cells as $c): if ($c['week_type'] === 'even'): ?>
-                        <?= htmlspecialchars($c['type'], ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'], ENT_QUOTES) ?><br>
-                        <?php if ($c['location']): ?>
-                          <small><?= htmlspecialchars($c['location'], ENT_QUOTES) ?></small><br>
-                        <?php endif; ?>
-                      <?php endif; endforeach; ?>
-                    </div>
-                  </td>
-                <?php else: ?>
-                  <?php
-                    $cell = $cells[0] ?? null;
-                    if ($cell) {
-                      $inner  = htmlspecialchars($cell['type'], ENT_QUOTES) . '. ' . htmlspecialchars($cell['subject'], ENT_QUOTES);
-                      if ($cell['location']) {
-                        $inner .= '<br><small>' . htmlspecialchars($cell['location'], ENT_QUOTES) . '</small>';
-                      }
-                      echo weekCell($cell, $inner);
-                    } else {
-                      echo '<td></td>';
-                    }
-                  ?>
-                <?php endif; ?>
-              <?php endforeach; ?>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
+        <?php
+  // 1) Filter out any time‐slot where *all* days are empty
+  $filteredSlots = array_filter($timeSlots, function($slot) use($dayLabels, $grid) {
+    foreach ($dayLabels as $d) {
+      if (! empty($grid[$slot][$d]) ) {
+        // at least one session (full, odd, or even)
+        return true;
+      }
+    }
+    // no sessions this slot → remove it
+    return false;
+  });
+?>
+<tbody>
+  <?php foreach ($filteredSlots as $slot): ?>
+
+    <!-- ODD‐WEEK ROW (and full‐week slots) -->
+    <tr>
+      <!-- time cell spans both sub‐rows -->
+      <td rowspan="2"><?= htmlspecialchars($slot, ENT_QUOTES) ?></td>
+
+      <?php foreach ($dayLabels as $d):
+        $cells = $grid[$slot][$d] ?? [];
+        $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
+        $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
+        $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
+      ?>
+
+        <?php if (count($full)): 
+          // full‐week session → spans both rows
+          $c   = reset($full);
+          $cls = 'week-cell'; // full‐week uses default styling
+        ?>
+          <td rowspan="2" class="<?= $cls ?>">
+            <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+            <?php if ($c['location']): ?>
+              <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small>
+            <?php endif; ?>
+          </td>
+
+        <?php elseif (count($odd) && count($even)): ?>
+          <!-- split cell: odd on top -->
+          <td class="week-cell odd">
+            <?php foreach ($odd as $c): ?>
+              <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+              <?php if ($c['location']): ?>
+                <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </td>
+
+        <?php elseif (count($odd)): ?>
+          <!-- odd only -->
+          <td class="week-cell odd">
+            <?php foreach ($odd as $c): ?>
+              <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+              <?php if ($c['location']): ?>
+                <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </td>
+
+        <?php else: ?>
+          <!-- no full/odd here -->
+          <td>&nbsp;</td>
+        <?php endif; ?>
+
+      <?php endforeach; ?>
+    </tr>
+
+    <!-- EVEN‐WEEK ROW -->
+    <tr>
+      <?php foreach ($dayLabels as $d):
+        $cells = $grid[$slot][$d] ?? [];
+        $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
+        $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
+        $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
+      ?>
+
+        <?php if (count($full)): 
+          // already rendered above (rowspan)
+          continue;
+
+        elseif (count($odd) && count($even)): ?>
+          <!-- split cell: even on bottom -->
+          <td class="week-cell even">
+            <?php foreach ($even as $c): ?>
+              <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+              <?php if ($c['location']): ?>
+                <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </td>
+
+        <?php elseif (count($even)): ?>
+          <!-- even only -->
+          <td class="week-cell even">
+            <?php foreach ($even as $c): ?>
+              <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+              <?php if ($c['location']): ?>
+                <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </td>
+
+        <?php else: ?>
+          <!-- no even/full here -->
+          <td>&nbsp;</td>
+        <?php endif; ?>
+
+      <?php endforeach; ?>
+    </tr>
+
+  <?php endforeach; ?>
+</tbody>
+
       </table>
     <?php endif; ?>
 
@@ -354,7 +452,7 @@ th, td {
 
   <?php else: ?>
     <!-- === DAILY VIEW: four columns instead of “Details” === -->
-    <table>
+    <table >
       <thead>
         <tr>
           <th>Time</th>
@@ -363,7 +461,7 @@ th, td {
           <th>Location</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody >
         <?php foreach ($schedule as $r): ?>
           <tr>
             <!-- Time slot -->
