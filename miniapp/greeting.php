@@ -175,10 +175,6 @@ th, td {
     td.split-cell > .bottom {
       flex:1; padding:.4em;
     }
-    hr.split-divider {
-      border:0; border-top:1px solid var(--border);
-      margin:.3em 0;
-    }
     .switch { position:relative; display:inline-block; width:50px; height:24px; }
     .switch input { opacity:0; width:0; height:0; }
     .slider {
@@ -253,7 +249,7 @@ th, td {
                           <?php endif; ?>
                         <?php endif; ?>
                       <?php endforeach; ?>
-                      <hr class="split-divider">
+                    
                     </div>
                     <div class="bottom">
                       <?php foreach ($cells as $c): ?>
