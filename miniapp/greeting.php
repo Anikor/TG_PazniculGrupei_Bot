@@ -318,7 +318,7 @@ td.week-cell.odd {
     <?php if (empty($grid)): ?>
       <p>No classes scheduled this week.</p>
     <?php else: ?>
-      <table>
+      <table >
         <thead>
           <tr>
             <th>Time / Day</th>
@@ -452,7 +452,7 @@ td.week-cell.odd {
 
   <?php else: ?>
     <!-- === DAILY VIEW: four columns instead of “Details” === -->
-    <table >
+    <table>
       <thead>
         <tr>
           <th>Time</th>
