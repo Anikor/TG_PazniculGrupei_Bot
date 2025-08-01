@@ -74,12 +74,12 @@ switch ($when) {
         // Fetch all entries for this group
         $stmt = $pdo->prepare("
             SELECT day_of_week, time_slot, type, subject, location, week_type
-            FROM schedule
-            WHERE group_id = ?
-              AND day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')
-            ORDER BY
-              FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday'),
-              STR_TO_DATE(SUBSTRING_INDEX(time_slot,'-',1),'%H:%i')
+              FROM schedule
+             WHERE group_id = ?
+               AND day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')
+             ORDER BY
+               FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday'),
+               STR_TO_DATE(SUBSTRING_INDEX(time_slot,'-',1),'%H:%i')
         ");
         $stmt->execute([$user['group_id']]);
         $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -103,6 +103,22 @@ switch ($when) {
         $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
         break;
 }
+
+/**
+ * Wraps HTML in a <td> with odd/even classes.
+ *
+ * @param array  $slot    Must have ['week_type'] = 'odd'|'even'|null
+ * @param string $content Inner HTML for the cell
+ * @return string         The <td>…</td>
+ */
+function weekCell(array $slot, string $content): string {
+    $classes = [];
+    if (!empty($slot['week_type'])) {
+        $classes = ['week-cell', $slot['week_type']];
+    }
+    $cls = $classes ? ' class="'.implode(' ',$classes).'"' : '';
+    return "<td{$cls}>{$content}</td>";
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -112,6 +128,7 @@ switch ($when) {
   <title>Welcome</title>
   <style>
 
+    /* restore normal table layout, even on narrow screens */
 table {
   display: table !important;
   width: 100% !important;
@@ -131,74 +148,127 @@ th, td {
   position: static    !important;
 }
     :root {
-      --bg:#fff; --fg:#000;
-      --link-bg:#eee; --link-fg:#000;
-      --btn-bg:#2a9df4; --btn-fg:#fff;
-      --border:#ccc; --sec-bg:#f5f5f5;
+      /* core palette */
+      --bg: #fff;            --fg: #000;
+      --link-bg: #eee;       --link-fg: #000;
+      --btn-bg: #2a9df4;     --btn-fg: #fff;
+      --border: #ccc;        --sec-bg: #f5f5f5;
+
+      /* odd/even highlights (light mode) */
+      --even-bg: #e6f7e6;     --even-fg: #155724;
+      --odd-bg:  #fff9e6;     --odd-fg:  #856404;
     }
     .dark-theme {
-      --bg:#2b2d2f; --fg:#e2e2e4;
-      --link-bg:#3b3f42; --link-fg:#e2e2e4;
-      --btn-bg:#1a73e8; --btn-fg:#fff;
-      --border:#444; --sec-bg:#3b3f42;
+      /* core palette */
+      --bg: #2b2d2f;         --fg: #e2e2e4;
+      --link-bg: #3b3f42;    --link-fg: #e2e2e4;
+      --btn-bg: #1a73e8;     --btn-fg: #fff;
+      --border: #444;        --sec-bg: #3b3f42;
+
+      /* odd/even highlights (dark mode) */
+      --even-bg: #264d26;    --even-fg: #d4edda;
+      --odd-bg:  #665500;    --odd-fg:  #fff3cd;
     }
+
     body {
-      margin:0; padding:1rem; font-family:sans-serif;
-      background:var(--bg); color:var(--fg);
+      margin: 0; padding: 1rem;
+      font-family: sans-serif;
+      background: var(--bg);
+      color: var(--fg);
     }
     a {
-      display:inline-block; margin:0 .5em .5em 0;
-      padding:.5em 1em; border-radius:4px;
-      background:var(--link-bg); color:var(--link-fg);
-      text-decoration:none;
+      display: inline-block;
+      margin: 0 .5em .5em 0;
+      padding: .5em 1em;
+      border-radius: 4px;
+      background: var(--link-bg);
+      color: var(--link-fg);
+      text-decoration: none;
     }
     .btn-primary {
-      background:var(--btn-bg); color:var(--btn-fg);
+      background: var(--btn-bg);
+      color: var(--btn-fg);
     }
     table {
-      width:100%; border-collapse:collapse; margin-top:1rem;
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
     }
     th, td {
-      border:1px solid var(--border);
-      padding:.5em; text-align:center; vertical-align:top;
+      border: 1px solid var(--border);
+      padding: .5em;
+      text-align: center;
+      vertical-align: top;
     }
     thead th {
-      background:var(--sec-bg);  position: static !important;
-    top: auto !important; z-index: auto !important;
+      background: var(--sec-bg);
     }
+
+    /* Legend pills */
+    .week-type {
+      display: inline-block;
+      padding: .2em .5em;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .week-type.even { background: var(--even-bg); color: var(--even-fg); }
+    .week-type.odd  { background: var(--odd-bg);  color: var(--odd-fg); }
+
+    /* Colored cells */
+    .week-cell {
+      border-radius: 4px;
+    }
+    .week-cell.even { background: var(--even-bg); color: var(--even-fg); }
+    .week-cell.odd  { background: var(--odd-bg);  color: var(--odd-fg); }
+
+    /* Split-cell styling */
     td.split-cell {
-      display:flex; flex-direction:column; padding:0;
+      flex-direction: column;
+      padding: 0;
     }
-    td.split-cell > .top {
-      flex:1; padding:.4em; border-bottom:1px solid var(--border);
+    td.split-cell > .top,
+    td.split-cell > .bottom {
+      padding: .4em;
+
+      border-bottom: 1px solid var(--border);
     }
     td.split-cell > .bottom {
-      flex:1; padding:.4em;
+      border-bottom: none;
     }
-    .switch { position:relative; display:inline-block; width:50px; height:24px; }
-    .switch input { opacity:0; width:0; height:0; }
+
+    /* Theme toggle */
+    .switch { position: relative; display: inline-block; width: 50px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
     .slider {
-      position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0;
-      background:#ef5350; transition:.4s; border-radius:24px;
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc; transition: .4s; border-radius: 24px;
     }
     .slider:before {
-      position:absolute; content:""; height:18px; width:18px;
-      left:3px; bottom:3px; background:#fff; transition:.4s; border-radius:50%;
+      content: ""; position: absolute;
+      height: 18px; width: 18px;
+      left: 3px; bottom: 3px;
+      background: white; transition: .4s; border-radius: 50%;
     }
-    input:checked + .slider { background:#66bb6a; }
-    input:checked + .slider:before { transform:translateX(26px); }
+    input:checked + .slider {
+      background: #66bb6a;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
   </style>
 </head>
-<body class="<?= (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark-theme':'' ?>">
+<body class="<?= (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark-theme' : '' ?>">
 
+  <!-- Theme toggle -->
   <label class="switch">
     <input type="checkbox" id="theme-toggle">
     <span class="slider"></span>
   </label>
   <span id="theme-label">Light</span>
 
-  <h1>Hello, <?= htmlspecialchars($user['name'],ENT_QUOTES) ?>!</h1>
-  <p>Role: <strong><?= htmlspecialchars(ucfirst($user['role']),ENT_QUOTES) ?></strong></p>
+  <h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
+  <p>Role: <strong><?= ucfirst(htmlspecialchars($user['role'], ENT_QUOTES)) ?></strong></p>
 
   <nav>
     <a href="?tg_id=<?= $tg_id ?>&when=yesterday">← Yesterday</a>
@@ -208,9 +278,10 @@ th, td {
   </nav>
 
   <h2><?= $label ?>’s Schedule</h2>
+    <p>This is an <span class="week-type <?= $weekType ?>"><?= ucfirst($weekType) ?></span> week.</p>
 
   <?php if ($when === 'week'): ?>
-    <p>This is an <em><?= ucfirst(htmlspecialchars($weekType,ENT_QUOTES)) ?></em> week.</p>
+
     <?php if (empty($grid)): ?>
       <p>No classes scheduled this week.</p>
     <?php else: ?>
@@ -219,58 +290,56 @@ th, td {
           <tr>
             <th>Time / Day</th>
             <?php foreach ($dayLabels as $d): ?>
-              <th><?= htmlspecialchars($d,ENT_QUOTES) ?></th>
+              <th><?= htmlspecialchars($d, ENT_QUOTES) ?></th>
             <?php endforeach; ?>
           </tr>
         </thead>
         <tbody>
-          <?php foreach ($timeSlots as $slot): ?>
+          <?php foreach ($timeSlots as $slotTime): ?>
             <tr>
-              <td><?= htmlspecialchars($slot,ENT_QUOTES) ?></td>
-              <?php foreach ($dayLabels as $d): ?>
+              <th><?= htmlspecialchars($slotTime, ENT_QUOTES) ?></th>
+              <?php foreach ($dayLabels as $day): ?>
                 <?php
-                  $cells = $grid[$slot][$d] ?? [];
+                  $cells = $grid[$slotTime][$day] ?? [];
                   $hasOdd = $hasEven = false;
                   foreach ($cells as $c) {
                     if ($c['week_type'] === 'odd')  $hasOdd  = true;
                     if ($c['week_type'] === 'even') $hasEven = true;
                   }
-                  // split any time we have both an odd and an even entry
                   $split = $hasOdd && $hasEven;
                 ?>
                 <?php if ($split): ?>
                   <td class="split-cell">
-                    <div class="top">
-                      <?php foreach ($cells as $c): ?>
-                        <?php if ($c['week_type'] === 'odd'): ?>
-                          <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
-                          <?php if ($c['location']): ?>
-                            <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br>
-                          <?php endif; ?>
+                    <div class="top week-cell odd">
+                      <?php foreach ($cells as $c): if ($c['week_type'] === 'odd'): ?>
+                        <?= htmlspecialchars($c['type'], ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'], ENT_QUOTES) ?><br>
+                        <?php if ($c['location']): ?>
+                          <small><?= htmlspecialchars($c['location'], ENT_QUOTES) ?></small><br>
                         <?php endif; ?>
-                      <?php endforeach; ?>
-                    
+                      <?php endif; endforeach; ?>
                     </div>
-                    <div class="bottom">
-                      <?php foreach ($cells as $c): ?>
-                        <?php if ($c['week_type'] === 'even'): ?>
-                          <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
-                          <?php if ($c['location']): ?>
-                            <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br>
-                          <?php endif; ?>
+                    <div class="bottom week-cell even">
+                      <?php foreach ($cells as $c): if ($c['week_type'] === 'even'): ?>
+                        <?= htmlspecialchars($c['type'], ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'], ENT_QUOTES) ?><br>
+                        <?php if ($c['location']): ?>
+                          <small><?= htmlspecialchars($c['location'], ENT_QUOTES) ?></small><br>
                         <?php endif; ?>
-                      <?php endforeach; ?>
+                      <?php endif; endforeach; ?>
                     </div>
                   </td>
                 <?php else: ?>
-                  <td>
-                    <?php foreach ($cells as $c): ?>
-                      <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
-                      <?php if ($c['location']): ?>
-                        <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br>
-                      <?php endif; ?>
-                    <?php endforeach; ?>
-                  </td>
+                  <?php
+                    $cell = $cells[0] ?? null;
+                    if ($cell) {
+                      $inner  = htmlspecialchars($cell['type'], ENT_QUOTES) . '. ' . htmlspecialchars($cell['subject'], ENT_QUOTES);
+                      if ($cell['location']) {
+                        $inner .= '<br><small>' . htmlspecialchars($cell['location'], ENT_QUOTES) . '</small>';
+                      }
+                      echo weekCell($cell, $inner);
+                    } else {
+                      echo '<td></td>';
+                    }
+                  ?>
                 <?php endif; ?>
               <?php endforeach; ?>
             </tr>
@@ -279,28 +348,55 @@ th, td {
       </table>
     <?php endif; ?>
 
-  <?php elseif (empty($schedule)): ?>
-    <p>No classes scheduled.</p>
+    <?php elseif (empty($schedule)): ?>
+
+    <p>No classes scheduled <?= $when === 'today' ? 'today' : 'for ' . htmlspecialchars($when, ENT_QUOTES) ?>.</p>
 
   <?php else: ?>
+    <!-- === DAILY VIEW: four columns instead of “Details” === -->
     <table>
       <thead>
-        <tr><th>Time</th><th>Type</th><th>Subject</th><th>Location</th></tr>
+        <tr>
+          <th>Time</th>
+          <th>Type</th>
+          <th>Subject</th>
+          <th>Location</th>
+        </tr>
       </thead>
       <tbody>
         <?php foreach ($schedule as $r): ?>
           <tr>
-            <td><?= htmlspecialchars($r['time_slot'],ENT_QUOTES) ?></td>
-            <td><?= htmlspecialchars($r['type'],ENT_QUOTES) ?></td>
-            <td><?= htmlspecialchars($r['subject'],ENT_QUOTES) ?></td>
-            <td><?= htmlspecialchars($r['location'],ENT_QUOTES) ?></td>
+            <!-- Time slot -->
+            <td><?= htmlspecialchars($r['time_slot'], ENT_QUOTES) ?></td>
+
+            <!-- Type -->
+            <td<?= !empty($r['week_type'])
+                  ? ' class="week-cell '. $r['week_type'] .'"'
+                  : '' ?>>
+              <?= htmlspecialchars($r['type'], ENT_QUOTES) ?>
+            </td>
+
+            <!-- Subject -->
+            <td<?= !empty($r['week_type'])
+                  ? ' class="week-cell '. $r['week_type'] .'"'
+                  : '' ?>>
+              <?= htmlspecialchars($r['subject'], ENT_QUOTES) ?>
+            </td>
+
+            <!-- Location -->
+            <td<?= !empty($r['week_type'])
+                  ? ' class="week-cell '. $r['week_type'] .'"'
+                  : '' ?>>
+              <?= htmlspecialchars($r['location'], ENT_QUOTES) ?>
+            </td>
           </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
   <?php endif; ?>
 
-  <div style="margin-top:1rem;">
+
+    <div style="margin-top:1rem;">
     <?php if (in_array($user['role'], ['admin','monitor','moderator'], true)): ?>
       <a class="btn-primary" href="index.html?tg_id=<?= $tg_id ?>&when=<?= $when ?>">📝 Log Attendance</a>
     <?php endif; ?>
@@ -316,23 +412,25 @@ th, td {
   </div>
 
   <script>
-    const toggle = document.getElementById('theme-toggle'),
-          label  = document.getElementById('theme-label'),
-          saved  = localStorage.getItem('theme') || 'light';
-    if (saved === 'dark') {
-      document.body.classList.add('dark-theme');
-      toggle.checked = true;
-      label.textContent = 'Dark';
+    // Theme toggle persistence
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeLabel  = document.getElementById('theme-label');
+    const body        = document.body;
+    let current      = localStorage.getItem('theme') || 'light';
+    if (current === 'dark') {
+      body.classList.add('dark-theme');
+      themeToggle.checked = true;
+      themeLabel.textContent = 'Dark';
     }
-    toggle.addEventListener('change', () => {
-      if (toggle.checked) {
-        document.body.classList.add('dark-theme');
+    themeToggle.addEventListener('change', e => {
+      if (e.target.checked) {
+        body.classList.add('dark-theme');
         localStorage.setItem('theme','dark');
-        label.textContent = 'Dark';
+        themeLabel.textContent = 'Dark';
       } else {
-        document.body.classList.remove('dark-theme');
+        body.classList.remove('dark-theme');
         localStorage.setItem('theme','light');
-        label.textContent = 'Light';
+        themeLabel.textContent = 'Light';
       }
     });
   </script>
