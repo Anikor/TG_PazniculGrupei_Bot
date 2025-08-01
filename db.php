@@ -148,7 +148,9 @@ function getScheduleForDate(int $tg_id, string $date, ?string $weekType = null, 
             s.time_slot,
             s.type,
             s.subject,
-            s.location
+            s.location,
+            s.week_type, 
+            s.subgroup 
         FROM schedule s
         JOIN users u ON u.group_id = s.group_id
         WHERE u.tg_id        = :tg_id
