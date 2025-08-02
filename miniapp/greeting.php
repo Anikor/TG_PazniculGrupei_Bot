@@ -198,7 +198,7 @@ th, td {
       border: 1px solid var(--border);
       padding: .5em;
       text-align: center;
-      vertical-align: top;
+      vertical-align: middle;
     }
     thead th {
       background: var(--sec-bg);
@@ -301,7 +301,8 @@ td.week-cell.odd {
   <span id="theme-label">Light</span>
 
   <h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
-  <p>Role: <strong><?= ucfirst(htmlspecialchars($user['role'], ENT_QUOTES)) ?></strong></p>
+  <?php if ($user['role'] !== 'student'): ?>
+  <p>Role: <strong><?= ucfirst(htmlspecialchars($user['role'])) ?></strong></p><?php endif; ?>
 
   <nav>
     <a href="?tg_id=<?= $tg_id ?>&when=yesterday">← Yesterday</a>
