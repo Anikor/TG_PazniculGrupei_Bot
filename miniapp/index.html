@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/oe_weeks.php'; 
 
 // ─── CORS & PRELIGHT ─────────────────────────
 header('Access-Control-Allow-Origin: *');
@@ -80,7 +81,14 @@ $next1 = $offset + 1;
 
 // Data
 $user     = getUserByTgId($tg_id) ?: exit('Invalid user');
-$schedule = getScheduleForDate($tg_id, $date);
+
+// compute academic odd/even via semester logic
+$dt = new DateTime($date, new DateTimeZone('Europe/Chisinau'));
+[, , , $weekType] = computeSemesterAndWeek($dt);
+
+// now load the right lessons for that academic weekType
+$schedule = getScheduleForDate($tg_id, $date, $weekType);
+
 $students = getGroupStudents($user['group_id']);
 
 // Existing attendance lookup
@@ -195,6 +203,17 @@ html.js-ready #theme-switch { visibility: visible; }
     .mot-reason {
       font-size:0.85em; color:var(--fg); margin-top:4px;
     }
+
+      /* NEW: center the "Reason…" textbox */
+    .mot-container {
+      text-align: center;
+      margin-top: 4px;
+    }
+    .motiv-text {
+      display: block;
+      margin: 4px auto 0;
+    }
+
     #save-confirm {
       display:none; margin-top:15px;
       padding:10px; background:#d4edda; color:#155724;
