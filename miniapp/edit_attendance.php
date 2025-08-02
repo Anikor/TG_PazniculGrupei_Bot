@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/oe_weeks.php'; 
 
 // ─── CORS & PRELIGHT ─────────────────────────
 header('Access-Control-Allow-Origin: *');
@@ -20,6 +21,7 @@ if (! in_array($user['role'], ['admin','monitor','moderator'], true)) {
   exit('Access denied');
 }
 
+
 // ─── GROUP NAME ──────────────────────────────
 $stmt = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
 $stmt->execute([$user['group_id']]);
@@ -34,6 +36,13 @@ $dayLabel = match (true) {
   $offset === -1 => 'Yesterday',
   default        => abs($offset) . ' days ago'
 };
+
+// compute academic odd/even via semester logic
+$dt = new DateTime($date, new DateTimeZone('Europe/Chisinau'));
+[, , , $weekType] = computeSemesterAndWeek($dt);
+
+// now load the right lessons for that academic weekType
+$schedule = getScheduleForDate($tg_id, $date, $weekType);
 
 // ─── AJAX SAVE (UPDATE + LOG) ────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
@@ -79,6 +88,13 @@ $upd = $pdo->prepare("
        :old_reason, :new_reason)
   ");
 
+  $ins = $pdo->prepare("
+   INSERT INTO attendance
+     (user_id, schedule_id, date, present, motivated, motivation, marked_by)
+   VALUES
+     (:uid, :sid, :dt, :pres, :mot, :reason, :editor)
+ ");
+
   foreach ($data['attendance'] as $r) {
     // fetch old
     $sel->execute([
@@ -87,7 +103,21 @@ $upd = $pdo->prepare("
       ':uid' => $r['user_id']
     ]);
     $old = $sel->fetch(PDO::FETCH_ASSOC);
-    if (! $old) continue;
+
+  if (! $old) {
+    // this is a brand-new slot (e.g. GC on an old date) — INSERT it
+    $ins->execute([ 
+      ':uid'    => $r['user_id'], 
+      ':sid'    => $r['schedule_id'], 
+      ':dt'     => $date, 
+      ':pres'   => $r['present']   ? 1 : 0, 
+      ':mot'    => $r['motivated'] ? 1 : 0, 
+      ':reason' => $r['motivation'] ?: null, 
+      ':editor' => $user['id'],
+    ]); 
+    // (optionally) log this insertion into attendance_log here 
+    continue;
+  }   
 
     $new_pres   = $r['present']   ? 1 : 0;
     $new_mot    = $r['motivated'] ? 1 : 0;
@@ -127,7 +157,7 @@ $upd->execute([
 }
 
 // ─── PAGE RENDER ──────────────────────────────
-$schedule = getScheduleForDate($tg_id, $date);
+$schedule = getScheduleForDate($tg_id, $date, $weekType);
 $students = getGroupStudents($user['group_id']);
 
 // fetch existing attendance + original markers + updaters
