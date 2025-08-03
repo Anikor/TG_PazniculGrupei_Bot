@@ -1,94 +1,496 @@
 ﻿<?php
 // miniapp/greeting.php
-session_start();
-require_once __DIR__ . '/../config.php';  // has $BOT_TOKEN
-require_once __DIR__ . '/../db.php';      // has getUserByTgId()
 
-// 1) Fallback for Web—even when initData is missing—grab ?tg_id= from web.telegram.org
-if (!isset($_SESSION['user']) && isset($_GET['tg_id'])) {
-    $tg_id = intval($_GET['tg_id']);
-    $user  = getUserByTgId($tg_id) ?: exit('Unknown user');
-    $_SESSION['user'] = $user;
-    // redirect away from the ?tg_id so your links stay clean
-    header('Location: greeting.php');
-    exit;
-}
-
-// 2) Telegram-WebApp handshake (mobile/desktop clients)
-$raw = file_get_contents('php://input');
-$data = json_decode($raw, true) ?? [];
-if (!isset($_SESSION['user']) && !empty($data['initData'])) {
-    // parse & verify hash
-    parse_str($data['initData'], $auth);
-    $hash = $auth['hash'] ?? '';
-    unset($auth['hash']);
-
-    ksort($auth);
-    $checkArr = [];
-    foreach ($auth as $k => $v) {
-      $checkArr[] = "$k=$v";
-    }
-    $checkStr = implode("\n", $checkArr);
-
-    $secretKey = hash_hmac('sha256', $BOT_TOKEN, 'WebAppData', true);
-    $calcHash  = hash_hmac('sha256', $checkStr,   $secretKey);
-
-    if (!hash_equals($calcHash, $hash)) {
-      http_response_code(403);
-      exit('Invalid Telegram signature');
-    }
-
-    // lookup & seed session
-    $tg_id = intval($auth['id']);
-    $user  = getUserByTgId($tg_id) ?: exit('Unknown user');
-    $_SESSION['user'] = $user;
-
-    // reload into the real UI
-    header('Content-Type: application/json');
-    echo json_encode(['success'=>true]);
-    exit;
-}
-
-// 3) If we still don’t have a session, show the small JS “sign-in” page
-if (!isset($_SESSION['user'])) {
+// ————————————————————————————————————————————————
+// 1) Bootstrap for Telegram Web App (use POST for tg_id)
+// ————————————————————————————————————————————————
+if (!isset($_POST['tg_id'])) {
     ?><!DOCTYPE html>
-    <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <title>Signing you in…</title>
-        <script src="https://telegram.org/js/telegram-web-app.js"></script>
-      </head>
-      <body>
-        <p>🔒 Signing in via Telegram…</p>
-        <script>
-          const tg = window.Telegram.WebApp;
-          tg.expand();
-
-          fetch('greeting.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-            body: JSON.stringify({ initData: tg.initData })
-          })
-          .then(r => r.json())
-          .then(res => {
-            if (res.success) {
-              // we’re logged in—reload into the real UI
-              window.location.reload();
-            } else {
-              document.body.innerText = res.error || 'Login failed';
-            }
-          })
-          .catch(err => {
-            document.body.innerText = err.toString();
-          });
-        </script>
-      </body>
-    </html>
-    <?php
+    <html lang="en"><head><meta charset="UTF-8"><title>Loading…</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script></head>
+    <body><script>
+      const tg = window.Telegram.WebApp; tg.expand();
+      const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
+      if (!user) {
+        document.body.innerHTML = '<p style="color:red">Error: cannot detect Telegram user ID.</p>';
+      } else {
+        // Submit tg_id via POST
+        const form = document.createElement('form');
+        form.method = 'POST'; form.action = '';
+        const input = document.createElement('input');
+        input.type = 'hidden'; input.name = 'tg_id';
+        input.value = user.id;
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit();
+      }
+    </script></body></html><?php
     exit;
 }
 
-// 4) At this point, $_SESSION['user'] is set—just hand off to your old UI:
-$user = $_SESSION['user'];
-require __DIR__ . '/greeting_old.php';
+// ————————————————————————————————————————————————
+// 2) Main greeting page
+// ————————————————————————————————————————————————
+header('Content-Type: text/html; charset=UTF-8');
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/oe_weeks.php';
+
+// Identify user
+$tg_id = intval($_POST['tg_id']);
+$user  = getUserByTgId($tg_id);
+if (!$user) {
+    http_response_code(400);
+    exit('Error: invalid or unregistered Telegram ID');
+}
+
+// Compute odd/even week and subgroup
+$weekType = getCurrentWeekType();      // 'odd' or 'even'
+$subgroup = $user['subgroup'] ?? null; // 1, 2, or NULL
+
+// Admin override group?
+if ($user['role'] === 'admin' && isset($_GET['group_id'])) {
+    $g = intval($_GET['group_id']);
+    if ($g > 0) {
+        $user['group_id'] = $g;
+    }
+}
+
+// Choose view
+$when      = $_GET['when'] ?? 'today';
+$schedule  = [];
+$label     = '';
+$dayLabels = $timeSlots = $grid = [];
+
+switch ($when) {
+    case 'yesterday':
+        $date     = date('Y-m-d', strtotime('-1 day'));
+        $label    = 'Yesterday (' . date('d M Y', strtotime('-1 day')) . ')';
+        $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+        break;
+
+    case 'today':
+        $date     = date('Y-m-d');
+        $label    = 'Today (' . date('d M Y') . ')';
+        $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+        break;
+
+    case 'tomorrow':
+        $date     = date('Y-m-d', strtotime('+1 day'));
+        $label    = 'Tomorrow (' . date('d M Y', strtotime('+1 day')) . ')';
+        $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+        break;
+
+    case 'week':
+        $label = 'This Week';
+        // Fetch all entries for this group, ordering by day + start‐time
+        $stmt = $pdo->prepare("
+            SELECT day_of_week, time_slot, type, subject, location, week_type
+              FROM schedule
+             WHERE group_id = ?
+               AND day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')
+             ORDER BY
+               FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday'),
+               STR_TO_DATE(SUBSTRING_INDEX(time_slot,'-',1),'%H:%i')
+        ");
+        $stmt->execute([$user['group_id']]);
+        $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $dayLabels = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+        $timeSlots = array_unique(array_column($all, 'time_slot'));
+        usort($timeSlots, fn($a, $b) =>
+            strtotime(substr($a, 0, 5)) - strtotime(substr($b, 0, 5))
+        );
+
+        // Build a grid: [ time_slot ][ day_of_week ] → list of sessions
+        foreach ($all as $r) {
+            $grid[$r['time_slot']][$r['day_of_week']][] = $r;
+        }
+        break;
+
+    default:
+        http_response_code(400);
+        exit('Invalid view parameter');
+}
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Welcome</title>
+  <style>
+
+    /* restore normal table layout, even on narrow screens */
+    table {
+      display: table !important;
+      width: 100% !important;
+      table-layout: auto !important;
+    }
+    thead {
+      display: table-header-group !important;
+    }
+    tbody {
+      display: table-row-group !important;
+    }
+    tr {
+      display: table-row !important;
+    }
+    th, td {
+      display: table-cell !important;
+      position: static !important;
+    }
+
+    :root {
+      /* core palette */
+      --bg: #fff;            --fg: #000;
+      --link-bg: #eee;       --link-fg: #000;
+      --btn-bg: #2a9df4;     --btn-fg: #fff;
+      --border: #ccc;        --sec-bg: #f5f5f5;
+
+      /* odd/even highlights (light mode) */
+      --even-bg: #e6f7e6;     --even-fg: #155724;
+      --odd-bg:  #fff9e6;     --odd-fg:  #856404;
+    }
+    .dark-theme {
+      /* core palette */
+      --bg: #2b2d2f;         --fg: #e2e2e4;
+      --link-bg: #3b3f42;    --link-fg: #e2e2e4;
+      --btn-bg: #1a73e8;     --btn-fg: #fff;
+      --border: #444;        --sec-bg: #3b3f42;
+
+      /* odd/even highlights (dark mode) */
+      --even-bg: #264d26;    --even-fg: #d4edda;
+      --odd-bg:  #665500;    --odd-fg: #fff3cd;
+    }
+
+    body {
+      margin: 0; padding: 1rem;
+      font-family: sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+    }
+
+    a, button {
+      display: inline-block;
+      margin: 0 .5em .5em 0;
+      padding: .5em 1em;
+      border-radius: 4px;
+      background: var(--link-bg);
+      color: var(--link-fg);
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: var(--btn-bg);
+      color: var(--btn-fg);
+    }
+
+    td.week-cell {
+      border-radius: 4px;
+    }
+    td.week-cell.even {
+      background: var(--even-bg);
+      color: var(--even-fg);
+    }
+    td.week-cell.odd {
+      background: var(--odd-bg);
+      color: var(--odd-fg);
+    }
+
+    .schedule-table {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+    }
+    .schedule-table th,
+    .schedule-table td {
+      width: 16.66%;
+      height: 90px;
+      padding: 8px;
+      text-align: center;
+      vertical-align: middle;
+      overflow: hidden;
+      box-sizing: border-box;
+      border: 1px solid var(--border);
+    }
+    .schedule-table thead th {
+      background: var(--sec-bg);
+    }
+
+    .week-type {
+      display: inline-block;
+      padding: .2em .5em;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .week-type.even {
+      background: var(--even-bg);
+      color: var(--even-fg);
+    }
+    .week-type.odd {
+      background: var(--odd-bg);
+      color: var(--odd-fg);
+    }
+
+    /* Theme toggle */
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 50px; height: 24px;
+    }
+    .switch input {
+      opacity: 0; width: 0; height: 0;
+    }
+    .slider {
+      position: absolute; cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc; transition: .4s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      content: "";
+      position: absolute;
+      height: 18px; width: 18px;
+      left: 3px; bottom: 3px;
+      background: white; transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background: #66bb6a;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+
+  </style>
+</head>
+<body>
+
+  <!-- Theme toggle UI -->
+  <label class="switch">
+    <input type="checkbox" id="theme-toggle">
+    <span class="slider"></span>
+  </label>
+  <span id="theme-label">Light</span>
+
+  <h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
+  <?php if ($user['role'] !== 'student'): ?>
+    <p>Role: <strong><?= ucfirst(htmlspecialchars($user['role'], ENT_QUOTES)) ?></strong></p>
+  <?php endif; ?>
+
+  <!-- Navigation (via POST) -->
+  <form method="POST" action="?when=yesterday" style="display:inline">
+    <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+    <button type="submit">← Yesterday</button>
+  </form>
+  <form method="POST" action="?when=today" style="display:inline">
+    <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+    <button type="submit">Today</button>
+  </form>
+  <form method="POST" action="?when=tomorrow" style="display:inline">
+    <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+    <button type="submit">Tomorrow →</button>
+  </form>
+  <form method="POST" action="?when=week" style="display:inline">
+    <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+    <button type="submit">This Week</button>
+  </form>
+
+  <h2><?= htmlspecialchars($label, ENT_QUOTES) ?></h2>
+
+  <?php if ($when === 'week'): ?>
+
+    <p>This is an <span class="week-type <?= $weekType ?>"><?= ucfirst($weekType) ?></span> week.</p>
+
+    <?php if (empty($grid)): ?>
+      <p>No classes scheduled this week.</p>
+    <?php else: ?>
+      <?php
+        // Filter out time-slots where every day is empty
+        $filtered = array_filter($timeSlots, function($slot) use($dayLabels,$grid){
+          foreach($dayLabels as $d){
+            if (!empty($grid[$slot][$d])) return true;
+          }
+          return false;
+        });
+      ?>
+      <table class="schedule-table">
+        <thead>
+          <tr>
+            <th>Time / Day</th>
+            <?php foreach($dayLabels as $d): ?>
+              <th><?= htmlspecialchars($d,ENT_QUOTES) ?></th>
+            <?php endforeach; ?>
+          </tr>
+        </thead>
+        <tbody>
+          <?php foreach($filtered as $slot): ?>
+            <!-- ODD week row -->
+            <tr>
+              <td rowspan="2"><?= htmlspecialchars($slot,ENT_QUOTES) ?></td>
+              <?php foreach($dayLabels as $d):
+                $cells = $grid[$slot][$d] ?? [];
+                $full  = array_filter($cells, fn($c)=> $c['week_type']===null);
+                $odd   = array_filter($cells, fn($c)=> $c['week_type']==='odd');
+                $even  = array_filter($cells, fn($c)=> $c['week_type']==='even');
+              ?>
+                <?php if (count($full)): 
+                  $c = reset($full);
+                ?>
+                  <td rowspan="2" class="week-cell">
+                    <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+                    <?php if ($c['location']): ?>
+                      <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small>
+                    <?php endif; ?>
+                  </td>
+                <?php elseif(count($odd) && count($even)): ?>
+                  <td class="week-cell odd">
+                    <?php foreach($odd as $c): ?>
+                      <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+                      <?php if($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                    <?php endforeach; ?>
+                  </td>
+                <?php elseif(count($odd)): ?>
+                  <td class="week-cell odd">
+                    <?php foreach($odd as $c): ?>
+                      <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+                      <?php if($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                    <?php endforeach; ?>
+                  </td>
+                <?php else: ?>
+                  <td>&nbsp;</td>
+                <?php endif; ?>
+              <?php endforeach; ?>
+            </tr>
+            <!-- EVEN week row -->
+            <tr>
+              <?php foreach($dayLabels as $d):
+                $cells = $grid[$slot][$d] ?? [];
+                $full  = array_filter($cells, fn($c)=> $c['week_type']===null);
+                $odd   = array_filter($cells, fn($c)=> $c['week_type']==='odd');
+                $even  = array_filter($cells, fn($c)=> $c['week_type']==='even');
+              ?>
+                <?php if (count($full)): 
+                  continue;
+                elseif(count($odd) && count($even)): ?>
+                  <td class="week-cell even">
+                    <?php foreach($even as $c): ?>
+                      <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+                      <?php if($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                    <?php endforeach; ?>
+                  </td>
+                <?php elseif(count($even)): ?>
+                  <td class="week-cell even">
+                    <?php foreach($even as $c): ?>
+                      <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
+                      <?php if($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                    <?php endforeach; ?>
+                  </td>
+                <?php else: ?>
+                  <td>&nbsp;</td>
+                <?php endif; ?>
+              <?php endforeach; ?>
+            </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+
+  <?php elseif (empty($schedule)): ?>
+
+    <p>No classes scheduled <?= $when==='today' ? 'today' : 'for '.htmlspecialchars($when,ENT_QUOTES) ?>.</p>
+
+  <?php else: ?>
+    <!-- DAILY VIEW -->
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>Type</th><th>Subject</th><th>Location</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach($schedule as $r): ?>
+          <tr>
+            <td><?= htmlspecialchars($r['time_slot'],ENT_QUOTES) ?></td>
+            <td<?= !empty($r['week_type'])
+                  ? ' class="week-cell '.htmlspecialchars($r['week_type'],ENT_QUOTES).'"'
+                  : '' ?>>
+              <?= htmlspecialchars($r['type'],ENT_QUOTES) ?>
+            </td>
+            <td<?= !empty($r['week_type'])
+                  ? ' class="week-cell '.htmlspecialchars($r['week_type'],ENT_QUOTES).'"'
+                  : '' ?>>
+              <?= htmlspecialchars($r['subject'],ENT_QUOTES) ?>
+            </td>
+            <td><?= htmlspecialchars($r['location'],ENT_QUOTES) ?></td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  <?php endif; ?>
+
+  <hr>
+
+  <!-- Attendance buttons -->
+  <?php if ($when!=='week'): ?>
+    <form method="POST" action="index.php?when=<?= $when ?>" style="display:inline">
+      <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+      <button class="btn-primary" type="submit">📝 Log Attendance</button>
+    </form>
+  <?php endif; ?>
+
+  <form method="POST" action="view_attendance.php" style="display:inline">
+    <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+    <button class="btn-primary" type="submit">📊 View My Attendance</button>
+  </form>
+
+  <?php if (in_array($user['role'],['monitor','admin'],true)): ?>
+    <form method="POST" action="view_group_attendance.php?group_id=<?= $user['group_id'] ?>" style="display:inline">
+      <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+      <button class="btn-primary" type="submit">👥 View Group Attendance</button>
+    </form>
+    <form method="POST" action="export.php?group_id=<?= $user['group_id'] ?>" style="display:inline">
+      <input type="hidden" name="tg_id" value="<?= htmlspecialchars($tg_id,ENT_QUOTES) ?>">
+      <button class="btn-primary" type="submit">📥 Export Attendance</button>
+    </form>
+  <?php endif; ?>
+
+  <?php if ($user['role'] === 'admin'): ?>
+    <!-- Quick‐switch examples -->
+    <form method="POST" action="greeting.php?group_id=2" style="display:inline">
+      <input type="hidden" name="tg_id" value="348442139">
+      <button class="btn-primary" type="submit">Primary</button>
+    </form>
+    <form method="POST" action="greeting.php" style="display:inline">
+      <input type="hidden" name="tg_id" value="878801928">
+      <button class="btn-primary" type="submit">Secondary</button>
+    </form>
+  <?php endif; ?>
+
+  <script>
+    // Theme toggle persistence
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeLabel  = document.getElementById('theme-label');
+    const body        = document.body;
+    let current      = localStorage.getItem('theme') || 'light';
+    if (current === 'dark') {
+      body.classList.add('dark-theme');
+      themeToggle.checked = true;
+      themeLabel.textContent = 'Dark';
+    }
+    themeToggle.addEventListener('change', e => {
+      if (e.target.checked) {
+        body.classList.add('dark-theme');
+        localStorage.setItem('theme','dark');
+        themeLabel.textContent = 'Dark';
+      } else {
+        body.classList.remove('dark-theme');
+        localStorage.setItem('theme','light');
+        themeLabel.textContent = 'Light';
+      }
+    });
+  </script>
+</body>
+</html>
