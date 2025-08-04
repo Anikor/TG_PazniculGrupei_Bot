@@ -1,37 +1,40 @@
 <?php
 // miniapp/greeting.php
+session_start();
 
+// If client POSTs the Telegram ID, save it in session and exit
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $data = json_decode(file_get_contents('php://input'), true);
+  if (!empty($data['tg_id']) && ctype_digit((string)$data['tg_id'])) {
+    $_SESSION['tg_id'] = (int)$data['tg_id'];
+    exit;  // nothing else
+  }
+}
 
-
-
-// ————————————————————————————————————————————————
-// 1) Bootstrap for Telegram Web App (no ?tg_id yet)
-// ————————————————————————————————————————————————
-if (!isset($_GET['tg_id'])) {
-    ?><!DOCTYPE html>
-    <html lang="en"><head><meta charset="UTF-8"><title>Loading…</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script></head>
-    <body>
+// If we don’t yet have it in $_SESSION, render the bootstrap HTML/JS
+if (!isset($_SESSION['tg_id'])) {
+  ?><!DOCTYPE html>
+  <html><head><meta charset="utf-8"><title>Loading…</title></head><body>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      const tg   = window.Telegram.WebApp; tg.expand();
       
-      <script>
-      const tg = window.Telegram.WebApp; tg.expand();
       const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
       if (!user) {
-        document.body.innerHTML = '<p style="color:red">Error: cannot detect Telegram user ID.</p>';
+        document.body.innerHTML = '<p style="color:red">Cannot detect user ID</p>';
       } else {
-        const u = new URL(location.href);
-        u.searchParams.set('tg_id', user.id);
-        location.replace(u.toString());
+        // send it via POST
+        fetch(location.href, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tg_id: user.id })
+        }).then(() => location.reload());
       }
-    
-      if (window.location.search.includes('tg_id')) {
-    const clean = window.location.origin + window.location.pathname;
-    window.history.replaceState(null, '', clean);
-  }
-    
-    </script></body></html><?php
-    exit;
+    </script>
+  </body></html><?php
+  exit;
 }
+
 
 // ————————————————————————————————————————————————
 // 2) Main greeting page (we now have ?tg_id)
@@ -42,7 +45,8 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/oe_weeks.php';
 
 // Identify user
-$tg_id = intval($_GET['tg_id']);
+// from here on you have a session-stored ID
+$tg_id = $_SESSION['tg_id'];
 $user  = getUserByTgId($tg_id);
 if (!$user) {
     http_response_code(400);
