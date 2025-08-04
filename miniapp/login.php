@@ -56,3 +56,43 @@ $_SESSION['user'] = $user;
 
 // 8) Success
 echo json_encode(['success'=>true]);
+
+
+
+define('ENCRYPTION_KEY', hex2bin('0123456789abcdef0123456789abcdef'));
+define('ENCRYPTION_IV',  hex2bin('abcdef9876543210abcdef9876543210'));
+
+/**
+ * Encrypt a numeric Telegram ID into a URL-safe string.
+ */
+function encrypt_id(int $tg_id): string {
+    $plaintext = (string)$tg_id;
+    $cipher    = openssl_encrypt(
+        $plaintext,
+        'AES-128-CBC',
+        ENCRYPTION_KEY,
+        OPENSSL_RAW_DATA,
+        ENCRYPTION_IV
+    );
+    // prepend IV (optional here since IV is constant) or just base64
+    return rtrim(strtr(base64_encode($cipher), '+/', '-_'), '=');
+}
+
+/**
+ * Decrypt the token back into the original ID, or return null on failure.
+ */
+function decrypt_id(string $token): ?int {
+    // restore padding
+    $b64   = strtr($token, '-_', '+/') . str_repeat('=', (4 - strlen($token) % 4) % 4);
+    $cipher = base64_decode($b64, true);
+    if ($cipher === false) return null;
+    $plain = openssl_decrypt(
+        $cipher,
+        'AES-128-CBC',
+        ENCRYPTION_KEY,
+        OPENSSL_RAW_DATA,
+        ENCRYPTION_IV
+    );
+    if ($plain === false || !ctype_digit($plain)) return null;
+    return (int)$plain;
+}
