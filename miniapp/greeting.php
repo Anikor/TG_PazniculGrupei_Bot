@@ -249,6 +249,7 @@ function weekCell(array $slot, string $content): string {
   ──────────────────────────────────────────────────────────────*/
   table {
     border-collapse: collapse;
+    width: 100% !important;
     margin-top: 1rem;
   }
   th, td {
