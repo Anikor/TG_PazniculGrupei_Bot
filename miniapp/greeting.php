@@ -2,38 +2,52 @@
 // miniapp/greeting.php
 session_start();
 
-// If client POSTs the Telegram ID, save it in session and exit
+// 1) If the client POSTs the Telegram ID, save it in session and stop
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $data = json_decode(file_get_contents('php://input'), true);
   if (!empty($data['tg_id']) && ctype_digit((string)$data['tg_id'])) {
     $_SESSION['tg_id'] = (int)$data['tg_id'];
-    exit;  // nothing else
   }
+  exit;
 }
 
-// If we don’t yet have it in $_SESSION, render the bootstrap HTML/JS
+// 2) If we still don’t have tg_id in session, show a tiny bootstrap HTML/JS
 if (!isset($_SESSION['tg_id'])) {
   ?><!DOCTYPE html>
-  <html><head><meta charset="utf-8"><title>Loading…</title></head><body>
+  <html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Loading…</title>
+  </head>
+  <body>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script>
-      const tg   = window.Telegram.WebApp; tg.expand();
-      
+      const tg   = window.Telegram.WebApp;
+      tg.expand();
+
       const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
       if (!user) {
         document.body.innerHTML = '<p style="color:red">Cannot detect user ID</p>';
       } else {
-        // send it via POST
+        // 1) POST the ID to ourselves
         fetch(location.href, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ tg_id: user.id })
-        }).then(() => location.reload());
+        })
+        .then(() => {
+          // 2) remove any #tgWebAppData fragment
+          history.replaceState(null, '', location.pathname + location.search);
+          // 3) reload so we drop into the main greeting page
+          location.reload();
+        });
       }
     </script>
-  </body></html><?php
+  </body>
+  </html><?php
   exit;
 }
+
 
 
 // ————————————————————————————————————————————————
