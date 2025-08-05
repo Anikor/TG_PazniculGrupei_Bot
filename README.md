@@ -143,6 +143,7 @@ All percentages are calculated on‑the‑fly, giving you instant insight into w
 The **Export Attendance** feature lets you download your group’s attendance data as a CSV file. You can choose from five export modes:
 
 <img width="696" height="311" alt="image" src="https://github.com/user-attachments/assets/01ae65a6-7c65-4816-a4de-2b54cb15a754" />
+<br></br>
 
 | Button       | Description                                                        |
 |--------------|--------------------------------------------------------------------|
@@ -171,8 +172,7 @@ The **Export Attendance** feature lets you download your group’s attendance da
      where each `<Status>` is one of:
      - `Present`
      - `Absent`
-     - `Absent (Motivated)`
-     
+     <br>
      <img width="320" height="496" alt="image" src="https://github.com/user-attachments/assets/143672a0-0de7-4c2a-b987-042349276637" />
 
 3. **File naming convention**  
