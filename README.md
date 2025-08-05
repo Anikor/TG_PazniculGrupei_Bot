@@ -25,6 +25,24 @@ The Greeting Page is your bot’s central dashboard, designed for maximum conven
 ### User Context
 - Displays the student’s name and role (Student, Monitor, Admin, etc.) pulled directly from the database.
 
+  <img width="950" height="1108" alt="image" src="https://github.com/user-attachments/assets/a874fe7f-71ea-4cad-b191-e862654d9f0b" />
+
+### Weekly Schedule View
+Clicking “This Week” brings up your full timetable for the current week, with:
+
+Odd/Even Indicator
+- A clear badge (Odd or Even) shows which rotation you’re in.
+
+Day-by-Day Grid
+- Columns for Monday → Friday (or Saturday, Sunday if you have weekend classes)
+- Rows for each time slot (08:00–09:30, 09:45–11:15, etc.)
+
+Cells display:
+
+- Session type (curs., sem., lab.)
+- Subject name
+- Location (room or lab)
+
 ### Attendance Controls
 
 - View My Attendance (individual student history)
@@ -120,7 +138,46 @@ This page provides a high‑level overview of your entire group’s attendance:
 
 All percentages are calculated on‑the‑fly, giving you instant insight into who’s on track and who may need follow‑up.
 
+## Export Attendance
 
+The **Export Attendance** feature lets you download your group’s attendance data as a CSV file. You can choose from five export modes:
+
+<img width="696" height="311" alt="image" src="https://github.com/user-attachments/assets/01ae65a6-7c65-4816-a4de-2b54cb15a754" />
+
+| Button       | Description                                                        |
+|--------------|--------------------------------------------------------------------|
+| **This Week**   | All sessions from Monday through Sunday of the current week       |
+| **This Month**  | All sessions in the current calendar month                       |
+| **All Time**    | Every recorded session since the database was created            |
+| **By Subject**  | Attendance broken out per subject over the selected period       |
+| **By Student**  | Detailed, per-student history over the selected period           |
+
+### CSV Output Format
+
+1. **Header rows**  
+   - **Row 1:** `Group,<Your-Group-Name>`  
+   - **(When exporting “By Subject” only) Row 2:** `Subject,<Subject-Name>`  
+   - **Next row:** `Date,<Date1>,<Date2>,…`
+
+2. **Data rows**  
+   - **Column header:**  
+     ```
+     Student,<Status@Date1>,<Status@Date2>,…
+     ```
+   - **One row per student:**  
+     ```
+     <Student-Name>,<Status1>,<Status2>,…
+     ```
+     where each `<Status>` is one of:
+     - `Present`
+     - `Absent`
+     - `Absent (Motivated)`
+     
+     <img width="320" height="496" alt="image" src="https://github.com/user-attachments/assets/143672a0-0de7-4c2a-b987-042349276637" />
+
+3. **File naming convention**  
+
+Example: `group_241_attendance_month_01.08.2025`
 
 </details>
 
