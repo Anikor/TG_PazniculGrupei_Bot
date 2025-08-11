@@ -153,8 +153,16 @@ function weekCell(array $slot, string $content): string {
   th,td{display:table-cell!important;position:static!important}
 
   /* Colors */
-  :root{--bg:#fff;--fg:#000;--link-bg:#eee;--link-fg:#000;--btn-bg:#2a9df4;--btn-fg:#fff;--border:#ccc;--sec-bg:#f5f5f5;--even-bg:#e6f7e6;--even-fg:#155724;--odd-bg:#fff9e6;--odd-fg:#856404}
-  .dark-theme{--bg:#2b2d2f;--fg:#e2e2e4;--link-bg:#3b3f42;--link-fg:#e2e2e4;--btn-bg:#1a73e8;--btn-fg:#fff;--border:#444;--sec-bg:#3b3f42;--even-bg:#264d26;--even-fg:#d4edda;--odd-bg:#665500;--odd-fg:#fff3cd}
+  :root{
+    --bg:#fff;--fg:#000;--link-bg:#eee;--link-fg:#000;
+    --btn-bg:#2a9df4;--btn-fg:#fff;--border:#ccc;--sec-bg:#f5f5f5;
+    --even-bg:#e6f7e6;--even-fg:#155724;--odd-bg:#fff9e6;--odd-fg:#856404
+  }
+  .dark-theme{
+    --bg:#2b2d2f;--fg:#e2e2e4;--link-bg:#3b3f42;--link-fg:#e2e2e4;
+    --btn-bg:#1a73e8;--btn-fg:#fff;--border:#444;--sec-bg:#3b3f42;
+    --even-bg:#264d26;--even-fg:#d4edda;--odd-bg:#665500;--odd-fg:#fff3cd
+  }
 
   /* Base */
   body{margin:0;padding:1rem;font-family:sans-serif;background:var(--bg);color:var(--fg)}
@@ -170,9 +178,37 @@ function weekCell(array $slot, string $content): string {
   th,td{border:1px solid var(--border);padding:.5em;text-align:center;vertical-align:middle}
   thead th{background:var(--sec-bg)}
 
-  /* Week grid */
+  /* Week grid — fill width, equal day columns */
   .schedule-table{width:100%;table-layout:fixed;border-collapse:collapse}
-  .schedule-table th,.schedule-table td{width:.2em;height:.2em;text-align:center;vertical-align:middle;padding:8px;box-sizing:border-box}
+  .schedule-table th,.schedule-table td{
+    padding:8px;
+    box-sizing:border-box;
+    text-align:center;
+    vertical-align:middle;
+    white-space:normal;
+    word-break:normal;
+    overflow-wrap:break-word;
+  }
+
+  /* Headers: never split words */
+  .schedule-table thead th{
+    white-space:nowrap;
+    word-break:normal;
+    overflow-wrap:normal;
+  }
+
+  /* Fix only the Time column width and keep same padding */
+  .schedule-table th:first-child,
+  .schedule-table td:first-child{
+    width:60px;
+    min-width:60px;
+    max-width:60px;
+    white-space:normal;
+    padding: inherit !important;  /* keep same padding as others */
+    line-height:1.15;              /* optional: slightly tighter time text */
+    font-size:.95em;               /* optional: slightly smaller time font */
+  }
+
   .week-type{display:inline-block;padding:.2em .3em;border-radius:4px;font-weight:bold}
   .week-type.even{background:var(--even-bg);color:var(--even-fg)}
   .week-type.odd{background:var(--odd-bg);color:var(--odd-fg)}
@@ -189,9 +225,8 @@ function weekCell(array $slot, string $content): string {
   input:checked + .slider:before{transform:translateX(26px)}
 
   /* Remove dotted underline on our initials */
-abbr.subject-short {text-decoration: none;border-bottom: 0;cursor: default; /* optional */}
-/* Just in case some browsers reapply it on hover/focus */
-abbr.subject-short:hover,abbr.subject-short:focus {text-decoration: none;border-bottom: 0;}
+  abbr.subject-short{ text-decoration:none; border-bottom:0; cursor:default; }
+  abbr.subject-short:hover,abbr.subject-short:focus{ text-decoration:none; border-bottom:0; }
 
   /* SUBJECT FULL/SHORT SWITCH */
   .subject-short{display:none}
@@ -199,7 +234,25 @@ abbr.subject-short:hover,abbr.subject-short:focus {text-decoration: none;border-
     .subject-full{display:none}
     .subject-short{display:inline}
   }
+
+  /* Small screens: shorten weekday headers only (keep sizing) */
+  @media (max-width:520px){
+    .schedule-table thead th{position:relative}
+    .schedule-table thead th{font-size:0; line-height:1}
+    .schedule-table thead th:nth-child(1){font-size:inherit}
+    .schedule-table thead th:nth-child(2)::after{content:"Mon.";}
+    .schedule-table thead th:nth-child(3)::after{content:"Tue.";}
+    .schedule-table thead th:nth-child(4)::after{content:"Wed.";}
+    .schedule-table thead th:nth-child(5)::after{content:"Thu.";}
+    .schedule-table thead th:nth-child(6)::after{content:"Fri.";}
+    .schedule-table thead th::after{font-size:14px}
+  }
 </style>
+
+
+
+
+
 </head>
 
 <body class="<?= (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark-theme' : '' ?>">
