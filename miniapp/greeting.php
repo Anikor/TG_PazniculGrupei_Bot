@@ -143,7 +143,6 @@ function weekCell(array $slot, string $content): string {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Welcome</title>
-
 <style>
   /* Keep tables as tables on narrow screens */
   table{display:table!important;width:100%!important;table-layout:auto!important}
@@ -178,36 +177,17 @@ function weekCell(array $slot, string $content): string {
   th,td{border:1px solid var(--border);padding:.5em;text-align:center;vertical-align:middle}
   thead th{background:var(--sec-bg)}
 
-  /* Week grid — fill width, equal day columns */
+  /* Week grid */
   .schedule-table{width:100%;table-layout:fixed;border-collapse:collapse}
   .schedule-table th,.schedule-table td{
-    padding:8px;
-    box-sizing:border-box;
-    text-align:center;
-    vertical-align:middle;
-    white-space:normal;
-    word-break:normal;
-    overflow-wrap:break-word;
+    padding:8px; box-sizing:border-box; text-align:center; vertical-align:middle;
+    white-space:normal; word-break:normal; overflow-wrap:break-word;
   }
+  thead th{white-space:nowrap; word-break:normal; overflow-wrap:normal}
 
-  /* Headers: never split words */
-  .schedule-table thead th{
-    white-space:nowrap;
-    word-break:normal;
-    overflow-wrap:normal;
-  }
-
-  /* Fix only the Time column width and keep same padding */
-  .schedule-table th:first-child,
-  .schedule-table td:first-child{
-    width:60px;
-    min-width:60px;
-    max-width:60px;
-    white-space:normal;
-    padding: inherit !important;  /* keep same padding as others */
-    line-height:1.15;              /* optional: slightly tighter time text */
-    font-size:.95em;               /* optional: slightly smaller time font */
-  }
+  /* Column sizing via COLGROUP — only Time is capped */
+  .schedule-table col.col-time{ width:60px; }
+  .schedule-table col.col-day{ width:auto; }  /* share remaining space */
 
   .week-type{display:inline-block;padding:.2em .3em;border-radius:4px;font-weight:bold}
   .week-type.even{background:var(--even-bg);color:var(--even-fg)}
@@ -216,13 +196,14 @@ function weekCell(array $slot, string $content): string {
   .week-cell.even{background:var(--even-bg);color:var(--even-fg)}
   .week-cell.odd{background:var(--odd-bg);color:var(--odd-fg)}
 
-  /* Theme switch */
-  .switch{position:relative;display:inline-block;width:50px;height:24px;margin-right:.5rem;vertical-align:middle}
-  .switch input{opacity:0;width:0;height:0}
-  .slider{position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#ccc;transition:.4s;border-radius:24px}
-  .slider:before{content:"";position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:#fff;transition:.4s;border-radius:50%}
-  input:checked + .slider{background:#66bb6a}
-  input:checked + .slider:before{transform:translateX(26px)}
+  /* Theme switch slider */
+  .switch{position:relative; display:inline-block; width:50px; height:24px; vertical-align:middle; margin-right:.5rem;}
+  .switch input{opacity:0; width:0; height:0; position:absolute; inset:0;}
+  .slider{position:absolute; cursor:pointer; inset:0; background:#ccc; border-radius:24px; transition:.25s; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1);}
+  .slider:before{content:""; position:absolute; left:3px; bottom:3px; width:18px; height:18px; border-radius:50%; background:#fff; transition:.25s; box-shadow:0 1px 3px rgba(0,0,0,.2);}
+  .switch input:checked + .slider{ background:#66bb6a; }
+  .switch input:checked + .slider:before{ transform:translateX(26px); }
+  #theme-label{ margin-left:.5rem; vertical-align:middle; }
 
   /* Remove dotted underline on our initials */
   abbr.subject-short{ text-decoration:none; border-bottom:0; cursor:default; }
@@ -230,24 +211,35 @@ function weekCell(array $slot, string $content): string {
 
   /* SUBJECT FULL/SHORT SWITCH */
   .subject-short{display:none}
-  @media (max-width:520px){
+  @media (max-width:610px){
     .subject-full{display:none}
     .subject-short{display:inline}
   }
 
-  /* Small screens: shorten weekday headers only (keep sizing) */
-  @media (max-width:520px){
-    .schedule-table thead th{position:relative}
-    .schedule-table thead th{font-size:0; line-height:1}
-    .schedule-table thead th:nth-child(1){font-size:inherit}
-    .schedule-table thead th:nth-child(2)::after{content:"Mon.";}
-    .schedule-table thead th:nth-child(3)::after{content:"Tue.";}
-    .schedule-table thead th:nth-child(4)::after{content:"Wed.";}
-    .schedule-table thead th:nth-child(5)::after{content:"Thu.";}
-    .schedule-table thead th:nth-child(6)::after{content:"Fri.";}
-    .schedule-table thead th::after{font-size:14px}
+  /* Small screens (≤610px): shorten weekday headers AND make the table compact */
+  @media (max-width:610px){
+    /* header labels via ::after */
+    .schedule-table thead th{position:relative; font-size:0; line-height:1; padding:4px 4px;}
+    .schedule-table thead th:nth-child(1){font-size:inherit} /* keep "Time" normal */
+    .schedule-table thead th:nth-child(2)::after{content:"Mon."}
+    .schedule-table thead th:nth-child(3)::after{content:"Tue."}
+    .schedule-table thead th:nth-child(4)::after{content:"Wed."}
+    .schedule-table thead th:nth-child(5)::after{content:"Thu."}
+    .schedule-table thead th:nth-child(6)::after{content:"Fri."}
+    .schedule-table thead th::after{font-size:12px}
+
+    /* compact sizing */
+    .schedule-table{ font-size:12px; }
+    .schedule-table td{ padding:4px; line-height:1.15; }
+    .schedule-table small{ font-size:.8em; }
+    .week-type{ font-size:12px; padding:.1em .3em; border-radius:4px; }
+
+    /* optional: slightly narrower Time column on very small screens */
+    .schedule-table col.col-time{ width:52px; }
   }
 </style>
+
+
 
 
 
@@ -277,46 +269,65 @@ function weekCell(array $slot, string $content): string {
   </nav>
 
   <h2><?= $label ?>’s Schedule</h2>
-  <p>This is an <span class="week-type <?= $weekType ?>"><?= ucfirst($weekType) ?></span> week.</p>
+<p>This is an <span class="week-type <?= $weekType ?>"><?= ucfirst($weekType) ?></span> week.</p>
 
-  <?php if ($when === 'week'): ?>
+<?php if ($when === 'week'): ?>
 
-    <?php if (empty($grid)): ?>
-      <p>No classes scheduled this week.</p>
-    <?php else: ?>
-      <table class="schedule-table">
-        <thead>
-          <tr>
-            <th>Time</th>
-            <?php foreach ($dayLabels as $d): ?>
-              <th><?= htmlspecialchars($d, ENT_QUOTES) ?></th>
-            <?php endforeach; ?>
-          </tr>
-        </thead>
+  <?php if (empty($grid)): ?>
+    <p>No classes scheduled this week.</p>
+  <?php else: ?>
+    <table class="schedule-table">
+      <colgroup>
+        <col class="col-time">
+        <?php for ($i=0; $i<count($dayLabels); $i++): ?>
+          <col class="col-day">
+        <?php endfor; ?>
+      </colgroup>
 
-        <?php
-        // Filter out time-slots where all days are empty
-        $filteredSlots = array_filter($timeSlots, function($slot) use ($dayLabels, $grid) {
-          foreach ($dayLabels as $d) if (!empty($grid[$slot][$d])) return true;
-          return false;
-        });
-        ?>
-        <tbody>
-        <?php foreach ($filteredSlots as $slot): ?>
-          <!-- ODD row (top) -->
-          <tr>
-            <td rowspan="2"><?= htmlspecialchars($slot, ENT_QUOTES) ?></td>
-            <?php foreach ($dayLabels as $d):
-              $cells = $grid[$slot][$d] ?? [];
-              $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
-              $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
-              $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
-            ?>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <?php foreach ($dayLabels as $d): ?>
+            <th><?= htmlspecialchars($d, ENT_QUOTES) ?></th>
+          <?php endforeach; ?>
+        </tr>
+      </thead>
 
-              <?php if (count($full)): $c = reset($full); ?>
-                <td rowspan="2" class="week-cell">
+      <?php
+      $filteredSlots = array_filter($timeSlots, function($slot) use ($dayLabels, $grid) {
+        foreach ($dayLabels as $d) if (!empty($grid[$slot][$d])) return true;
+        return false;
+      });
+      ?>
+      <tbody>
+      <?php foreach ($filteredSlots as $slot): ?>
+        <!-- ODD row (top) -->
+        <tr>
+          <td rowspan="2"><?= htmlspecialchars($slot, ENT_QUOTES) ?></td>
+          <?php foreach ($dayLabels as $d):
+            $cells = $grid[$slot][$d] ?? [];
+            $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
+            $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
+            $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
+          ?>
+
+            <?php if (count($full)): $c = reset($full); ?>
+              <td rowspan="2" class="week-cell">
+                <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                <?php $subject = $c['subject']; ?>
+                <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                  <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                  <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
+                    <?= htmlspecialchars(initials($subject)) ?>
+                  </abbr>
+                </span><br>
+                <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><?php endif; ?>
+              </td>
+
+            <?php elseif (count($odd) && count($even)): ?>
+              <td class="week-cell odd">
+                <?php foreach ($odd as $c): ?>
                   <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
-                  <!-- SUBJECT FULL + SHORT -->
                   <?php $subject = $c['subject']; ?>
                   <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
                     <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
@@ -324,136 +335,123 @@ function weekCell(array $slot, string $content): string {
                       <?= htmlspecialchars(initials($subject)) ?>
                     </abbr>
                   </span><br>
-                  <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><?php endif; ?>
-                </td>
+                  <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
 
-              <?php elseif (count($odd) && count($even)): ?>
-                <td class="week-cell odd">
-                  <?php foreach ($odd as $c): ?>
-                    <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
-                    <?php $subject = $c['subject']; ?>
-                    <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
-                      <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
-                      <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
-                        <?= htmlspecialchars(initials($subject)) ?>
-                      </abbr>
-                    </span><br>
-                    <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
-                  <?php endforeach; ?>
-                </td>
+            <?php elseif (count($odd)): ?>
+              <td class="week-cell odd">
+                <?php foreach ($odd as $c): ?>
+                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                  <?php $subject = $c['subject']; ?>
+                  <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                    <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                    <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
+                      <?= htmlspecialchars(initials($subject)) ?>
+                    </abbr>
+                  </span><br>
+                  <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
 
-              <?php elseif (count($odd)): ?>
-                <td class="week-cell odd">
-                  <?php foreach ($odd as $c): ?>
-                    <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
-                    <?php $subject = $c['subject']; ?>
-                    <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
-                      <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
-                      <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
-                        <?= htmlspecialchars(initials($subject)) ?>
-                      </abbr>
-                    </span><br>
-                    <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
-                  <?php endforeach; ?>
-                </td>
+            <?php else: ?>
+              <td>&nbsp;</td>
+            <?php endif; ?>
 
-              <?php else: ?>
-                <td>&nbsp;</td>
-              <?php endif; ?>
+          <?php endforeach; ?>
+        </tr>
 
-            <?php endforeach; ?>
-          </tr>
+        <!-- EVEN row (bottom) -->
+        <tr>
+          <?php foreach ($dayLabels as $d):
+            $cells = $grid[$slot][$d] ?? [];
+            $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
+            $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
+            $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
+          ?>
 
-          <!-- EVEN row (bottom) -->
-<tr>
-  <?php foreach ($dayLabels as $d):
-    $cells = $grid[$slot][$d] ?? [];
-    $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
-    $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
-    $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
-  ?>
+            <?php if (count($full)): ?>
+              <?php continue; // row-spanned above ?>
 
-    <?php if (count($full)): ?>
-      <?php continue; // row-spanned above ?>
-    <?php elseif (count($odd) && count($even)): ?>
-      <td class="week-cell even">
-        <?php foreach ($even as $c): ?>
-          <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
-          <?php $subject = $c['subject']; ?>
-          <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
-            <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
-            <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
-              <?= htmlspecialchars(initials($subject)) ?>
-            </abbr>
-          </span><br>
-          <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
-        <?php endforeach; ?>
-      </td>
+            <?php elseif (count($odd) && count($even)): ?>
+              <td class="week-cell even">
+                <?php foreach ($even as $c): ?>
+                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                  <?php $subject = $c['subject']; ?>
+                  <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                    <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                    <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
+                      <?= htmlspecialchars(initials($subject)) ?>
+                    </abbr>
+                  </span><br>
+                  <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
 
-    <?php elseif (count($even)): ?>
-      <td class="week-cell even">
-        <?php foreach ($even as $c): ?>
-          <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
-          <?php $subject = $c['subject']; ?>
-          <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
-            <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
-            <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
-              <?= htmlspecialchars(initials($subject)) ?>
-            </abbr>
-          </span><br>
-          <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
-        <?php endforeach; ?>
-      </td>
+            <?php elseif (count($even)): ?>
+              <td class="week-cell even">
+                <?php foreach ($even as $c): ?>
+                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                  <?php $subject = $c['subject']; ?>
+                  <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                    <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                    <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
+                      <?= htmlspecialchars(initials($subject)) ?>
+                    </abbr>
+                  </span><br>
+                  <?php if ($c['location']): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
 
-    <?php else: ?>
-      <td>&nbsp;</td>
-    <?php endif; ?>
+            <?php else: ?>
+              <td>&nbsp;</td>
+            <?php endif; ?>
 
-  <?php endforeach; ?>
-</tr>
+          <?php endforeach; ?>
+        </tr>
 
-
-        <?php endforeach; ?>
-        </tbody>
-      </table>
-    <?php endif; ?>
-
-  <?php elseif (empty($schedule)): ?>
-
-    <p>No classes scheduled <?= $when === 'today' ? 'today' : 'for ' . htmlspecialchars($when, ENT_QUOTES) ?>.</p>
-
-  <?php else: ?>
-
-    <!-- DAILY / SINGLE-DAY TABLE -->
-    <table>
-      <thead>
-        <tr><th>Time</th><th>Type</th><th>Subject</th><th>Location</th></tr>
-      </thead>
-      <tbody>
-        <?php foreach ($schedule as $r): ?>
-          <tr>
-            <td><?= htmlspecialchars($r['time_slot'], ENT_QUOTES) ?></td>
-            <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
-              <?= htmlspecialchars($r['type'], ENT_QUOTES) ?>
-            </td>
-            <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
-              <?php $subject = $r['subject']; ?>
-              <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
-                <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
-                <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
-                  <?= htmlspecialchars(initials($subject)) ?>
-                </abbr>
-              </span>
-            </td>
-            <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
-              <?= htmlspecialchars($r['location'], ENT_QUOTES) ?>
-            </td>
-          </tr>
-        <?php endforeach; ?>
+      <?php endforeach; ?>
       </tbody>
     </table>
-
   <?php endif; ?>
+
+<?php elseif (empty($schedule)): ?>
+
+  <p>No classes scheduled <?= $when === 'today' ? 'today' : 'for ' . htmlspecialchars($when, ENT_QUOTES) ?>.</p>
+
+<?php else: ?>
+
+  <!-- DAILY / SINGLE-DAY TABLE -->
+  <table>
+    <thead>
+      <tr><th>Time</th><th>Type</th><th>Subject</th><th>Location</th></tr>
+    </thead>
+    <tbody>
+      <?php foreach ($schedule as $r): ?>
+        <tr>
+          <td><?= htmlspecialchars($r['time_slot'], ENT_QUOTES) ?></td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
+            <?= htmlspecialchars($r['type'], ENT_QUOTES) ?>
+          </td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
+            <?php $subject = $r['subject']; ?>
+            <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+              <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+              <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>">
+                <?= htmlspecialchars(initials($subject)) ?>
+              </abbr>
+            </span>
+          </td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
+            <?= htmlspecialchars($r['location'], ENT_QUOTES) ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+
+<?php endif; ?>
+
 
   <div style="margin-top:1rem;">
     <?php if (in_array($user['role'], ['admin','monitor','moderator'], true)): ?>
