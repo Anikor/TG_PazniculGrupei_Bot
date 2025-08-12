@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/oe_weeks.php'; 
 
 // ─── CORS & PRELIGHT ─────────────────────────
 header('Access-Control-Allow-Origin: *');
@@ -20,6 +21,7 @@ if (! in_array($user['role'], ['admin','monitor','moderator'], true)) {
   exit('Access denied');
 }
 
+
 // ─── GROUP NAME ──────────────────────────────
 $stmt = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
 $stmt->execute([$user['group_id']]);
@@ -34,6 +36,13 @@ $dayLabel = match (true) {
   $offset === -1 => 'Yesterday',
   default        => abs($offset) . ' days ago'
 };
+
+// compute academic odd/even via semester logic
+$dt = new DateTime($date, new DateTimeZone('Europe/Chisinau'));
+[, , , $weekType] = computeSemesterAndWeek($dt);
+
+// now load the right lessons for that academic weekType
+$schedule = getScheduleForDate($tg_id, $date, $weekType);
 
 // ─── AJAX SAVE (UPDATE + LOG) ────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
@@ -79,6 +88,13 @@ $upd = $pdo->prepare("
        :old_reason, :new_reason)
   ");
 
+  $ins = $pdo->prepare("
+   INSERT INTO attendance
+     (user_id, schedule_id, date, present, motivated, motivation, marked_by)
+   VALUES
+     (:uid, :sid, :dt, :pres, :mot, :reason, :editor)
+ ");
+
   foreach ($data['attendance'] as $r) {
     // fetch old
     $sel->execute([
@@ -87,7 +103,21 @@ $upd = $pdo->prepare("
       ':uid' => $r['user_id']
     ]);
     $old = $sel->fetch(PDO::FETCH_ASSOC);
-    if (! $old) continue;
+
+  if (! $old) {
+    // this is a brand-new slot (e.g. GC on an old date) — INSERT it
+    $ins->execute([ 
+      ':uid'    => $r['user_id'], 
+      ':sid'    => $r['schedule_id'], 
+      ':dt'     => $date, 
+      ':pres'   => $r['present']   ? 1 : 0, 
+      ':mot'    => $r['motivated'] ? 1 : 0, 
+      ':reason' => $r['motivation'] ?: null, 
+      ':editor' => $user['id'],
+    ]); 
+    // (optionally) log this insertion into attendance_log here 
+    continue;
+  }   
 
     $new_pres   = $r['present']   ? 1 : 0;
     $new_mot    = $r['motivated'] ? 1 : 0;
@@ -127,7 +157,7 @@ $upd->execute([
 }
 
 // ─── PAGE RENDER ──────────────────────────────
-$schedule = getScheduleForDate($tg_id, $date);
+$schedule = getScheduleForDate($tg_id, $date, $weekType);
 $students = getGroupStudents($user['group_id']);
 
 // fetch existing attendance + original markers + updaters
@@ -182,54 +212,118 @@ if (!empty($schedule)) {
     }
   } catch(e){}
 </script>
-  <style>
-    /* copy your index.html styles… */
-    :root { --bg:#fff; --fg:#000; --bd:#ccc; --sec:#f5f5f5; --btn:#2a9df4; --btnfg:#fff; }
-    .dark-theme { --bg:#2b2d2f; --fg:#e2e2e4; --bd:#444; --sec:#3b3f42; --btn:#1a73e8; --btnfg:#fff;}
-    body{margin:0;padding:10px;font-family:sans-serif;background:var(--bg);color:var(--fg);}
-    table{width:100%;border-collapse:collapse;margin-top:10px;}
-    th,td{border:1px solid var(--bd);padding:8px;text-align:center;}
-    th{background:var(--sec);}
-    .btn-submit{margin-top:15px;padding:10px 20px;border:none;border-radius:5px;
-      background:var(--btn);color:var(--btnfg);cursor:pointer;}
-    .switch { position:relative; display:inline-block; width:50px; height:24px; }
-.switch input { opacity:0; width:0; height:0; }
-.slider {
-  position:absolute; top:0; left:0; right:0; bottom:0;
-  background:#ef5350; border-radius:24px; transition:.4s;
-}
-.slider:before {
-  content:""; position:absolute;
-  width:18px; height:18px; left:3px; bottom:3px;
-  background:#fff; border-radius:50%; transition:.4s;
-}
-input:checked + .slider { background:#66bb6a; }
-input:checked + .slider:before { transform:translateX(26px); }
+ <style>
+  /* copy your index.html styles… */
+  :root {
+    --bg:#fff; --fg:#000; --bd:#ccc;
+    --sec:#f5f5f5; --btn:#2a9df4; --btnfg:#fff;
+  }
+  .dark-theme {
+    --bg:#2b2d2f; --fg:#e2e2e4; --bd:#444;
+    --sec:#3b3f42; --btn:#1a73e8; --btnfg:#fff;
+  }
 
-    .mot-container{margin-top:4px;}
-    .motiv-text{width:80px;}
-    .edit-info{font-size:0.8em;color:var(--fg);margin-top:4px;}
+  body {
+    margin:0; padding:10px;
+    font-family:sans-serif;
+    background:var(--bg);
+    color:var(--fg);
+  }
+  table {
+    width:100%;
+    border-collapse:collapse;
+    margin-top:10px;
+  }
+  th, td {
+    border:1px solid var(--bd);
+    padding:8px;
+    text-align:center;
+  }
+  th { background:var(--sec); }
 
-    .btn-nav {
-  margin-top:15px;
-  margin-right:8px;
-  padding:10px 20px;
-  border:none;
-  border-radius:5px;
-  background:var(--sec);
-  color:var(--fg);
-  cursor:pointer;
-}
-#theme-switch { visibility: hidden; }
-html.js-ready #theme-switch { visibility: visible; }
+  .btn-submit {
+    margin-top:15px;
+    padding:10px 20px;
+    border:none;
+    border-radius:5px;
+    background:var(--btn);
+    color:var(--btnfg);
+    cursor:pointer;
+  }
 
-/* hide all reason-boxes by default */
-.motiv-text {
-  display: none;
-}
+  .switch {
+    position:relative;
+    display:inline-block;
+    width:50px;
+    height:24px;
+  }
+  .switch input {
+    opacity:0; width:0; height:0;
+  }
+  .slider {
+    position:absolute;
+    top:0; left:0; right:0; bottom:0;
+    background:#ef5350;
+    border-radius:24px;
+    transition:.4s;
+  }
+  .slider:before {
+    content:"";
+    position:absolute;
+    width:18px; height:18px;
+    left:3px; bottom:3px;
+    background:#fff;
+    border-radius:50%;
+    transition:.4s;
+  }
+  input:checked + .slider {
+    background:#66bb6a;
+  }
+  input:checked + .slider:before {
+    transform:translateX(26px);
+  }
 
+  /* ─── Center Motivated under the switch ──────────────────────────── */
+  .mot-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .motiv-text {
+    width:80px;
+    /* hidden by default, shown via JS */
+    display: none;
+  }
+  .edit-info {
+    font-size:0.8em;
+    color:var(--fg);
+    margin-top:4px;
+  }
 
-  </style>
+  .btn-nav {
+    margin-top:15px;
+    margin-right:8px;
+    padding:10px 20px;
+    border:none;
+    border-radius:5px;
+    background:var(--sec);
+    color:var(--fg);
+    cursor:pointer;
+  }
+  #theme-switch { visibility: hidden; }
+  html.js-ready #theme-switch { visibility: visible; }
+
+  /* ─── Grey out Present slider when disabled ──────────────────────── */
+  .att-toggle:disabled + .slider {
+    background-color: #ccc !important;
+    cursor: not-allowed;
+  }
+  .att-toggle:disabled + .slider:before {
+    background-color: #eee !important;
+  }
+</style>
+
 </head>
 <body>
   <div id="theme-switch">
@@ -309,117 +403,126 @@ html.js-ready #theme-switch { visibility: visible; }
     <button class="btn-submit">Save changes</button>
   <?php endif; ?>
 
-  <script>
-    // show/hide reason based on present
-    document.querySelectorAll('.att-toggle').forEach(chk=>{
-      chk.addEventListener('change',()=>{
-        const id=chk.id.replace('att_','');
-        document.getElementById('mot_cont_'+id).style.display = chk.checked ? 'none':'block';
-      });
+<script>
+  // ─── Show/hide reason based on Present toggle ────────────────────────
+  document.querySelectorAll('.att-toggle').forEach(chk => {
+    chk.addEventListener('change', () => {
+      const id = chk.id.replace('att_','');
+      document.getElementById('mot_cont_'+id).style.display = chk.checked ? 'none' : 'block';
     });
-    // show/hide text on mot toggle
-    document.querySelectorAll('.mot-toggle').forEach(chk=>{
-      chk.addEventListener('change',()=>{
-        const id=chk.id.replace('mot_',''),
-              txt=document.getElementById('mot_text_'+id);
-        if(chk.checked) txt.style.display='inline-block';
-        else { txt.style.display='none'; txt.value=''; }
-      });
-      // init
-      const id=chk.id.replace('mot_',''),
-            txt=document.getElementById('mot_text_'+id);
-      if(!chk.checked) txt.style.display='none';
-    });
+  });
 
-    document.querySelector('.btn-submit')?.addEventListener('click',async()=>{
-      if(!confirm('Really save edits for <?= $dayLabel ?>?'))return;
-      const out={attendance:[]};
-      <?php foreach($schedule as $s): foreach($students as $u): ?>
-      (()=>{
-        const id='<?= $s['id'].'_'.$u['id'] ?>',
-              att=document.getElementById('att_'+id),
-              mot=document.getElementById('mot_'+id),
-              reason=document.getElementById('mot_text_'+id).value;
-        out.attendance.push({
-          schedule_id: <?= $s['id'] ?>,
-          user_id:     <?= $u['id'] ?>,
-          present:     att.checked,
-          motivated:   !att.checked && mot.checked,
-          motivation:  (!att.checked && mot.checked) ? reason : ''
-        });
-      })();
-      <?php endforeach; endforeach; ?>
+  // ─── Show/hide motivation text based on Motivated checkbox ───────────
+  document.querySelectorAll('.mot-toggle').forEach(chk => {
+    const id  = chk.id.replace('mot_',''),
+          txt = document.getElementById('mot_text_'+id);
 
-      const url = `${location.origin}${location.pathname}${location.search}`;
-      try {
-        const resp = await fetch(url, {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body: JSON.stringify(out)
-        });
-        const j = await resp.json();
-        if (j.success) {
-          alert('Changes saved successfully!');
-          location.reload();
-        } else {
-          alert('Save failed: '+(j.error||'unknown'));
-        }
-      } catch(e) {
-        alert('Network error: '+e.message);
+    // init: hide text if not checked
+    if (!chk.checked) {
+      txt.style.display = 'none';
+    }
+
+    chk.addEventListener('change', () => {
+      if (chk.checked) {
+        txt.style.display = 'inline-block';
+      } else {
+        txt.style.display = 'none';
+        txt.value = '';
       }
     });
+  });
 
-  // THEME SWITCH
-;(function(){
-  const htmlEl     = document.documentElement;
-  const toggle     = document.getElementById('theme-toggle');
-  const label      = document.getElementById('theme-label');
+  // ─── Disable “Present” slider when “Motivated” is checked ─────────────
+  document.querySelectorAll('.mot-toggle').forEach(motChk => {
+    const id  = motChk.id.replace('mot_',''),
+          att = document.getElementById('att_'+id);
 
-  // initialize from localStorage
-  if (localStorage.getItem('theme') === 'dark') {
-    toggle.checked = true;
-    htmlEl.classList.add('dark-theme');
-    label.textContent = 'Dark';
-  } else {
-    toggle.checked = false;
-    label.textContent = 'Light';
-  }
+    // init: if Motivated already checked, clear & disable Present
+    if (motChk.checked) {
+      att.checked  = false;
+      att.disabled = true;
+    }
 
-  // on user click
-  toggle.addEventListener('change', () => {
-    if (toggle.checked) {
+    motChk.addEventListener('change', () => {
+      if (motChk.checked) {
+        att.checked  = false;
+        att.disabled = true;
+      } else {
+        att.disabled = false;
+      }
+    });
+  });
+
+  // ─── Submit handler ───────────────────────────────────────────────────
+  document.querySelector('.btn-submit')?.addEventListener('click', async () => {
+    if (!confirm('Really save edits for <?= $dayLabel ?>?')) return;
+
+    const out = { attendance: [] };
+    <?php foreach($schedule as $s): foreach($students as $u): ?>
+    (() => {
+      const id     = '<?= $s['id'].'_'.$u['id'] ?>',
+            attEl  = document.getElementById('att_'+id),
+            motEl  = document.getElementById('mot_'+id),
+            reason = document.getElementById('mot_text_'+id).value;
+
+      out.attendance.push({
+        schedule_id: <?= $s['id'] ?>,
+        user_id:     <?= $u['id'] ?>,
+        present:     attEl.checked,
+        motivated:   !attEl.checked && motEl.checked,
+        motivation:  (!attEl.checked && motEl.checked) ? reason : ''
+      });
+    })();
+    <?php endforeach; endforeach; ?>
+
+    const url = `${location.origin}${location.pathname}${location.search}`;
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(out)
+      });
+      const j = await resp.json();
+      if (j.success) {
+        alert('Changes saved successfully!');
+        location.reload();
+      } else {
+        alert('Save failed: ' + (j.error || 'unknown'));
+      }
+    } catch (e) {
+      alert('Network error: ' + e.message);
+    }
+  });
+
+  // ─── Theme toggle (Light/Dark) ───────────────────────────────────────
+  (function(){
+    const htmlEl = document.documentElement;
+    const toggle = document.getElementById('theme-toggle');
+    const label  = document.getElementById('theme-label');
+
+    // initialize from localStorage
+    if (localStorage.getItem('theme') === 'dark') {
+      toggle.checked = true;
       htmlEl.classList.add('dark-theme');
-      localStorage.setItem('theme','dark');
       label.textContent = 'Dark';
     } else {
-      htmlEl.classList.remove('dark-theme');
-      localStorage.setItem('theme','light');
+      toggle.checked = false;
       label.textContent = 'Light';
     }
-    // SHOW/HIDE reason-boxes
-    document.querySelectorAll('.mot-toggle').forEach(chk => {
-  // find its matching text-input
-  const id   = chk.id.replace('mot_','');
-  const txt  = document.getElementById('mot_text_'+id);
 
-  // toggle on load
-  txt.style.display = chk.checked ? 'inline-block':'none';
+    toggle.addEventListener('change', () => {
+      if (toggle.checked) {
+        htmlEl.classList.add('dark-theme');
+        localStorage.setItem('theme','dark');
+        label.textContent = 'Dark';
+      } else {
+        htmlEl.classList.remove('dark-theme');
+        localStorage.setItem('theme','light');
+        label.textContent = 'Light';
+      }
+    });
+  })();
+</script>
 
-  // toggle on user click
-  chk.addEventListener('change', () => {
-    if (chk.checked) {
-      txt.style.display = 'inline-block';
-    } else {
-      txt.style.display = 'none';
-      txt.value = '';
-    }
-  });
-});
-
-  });
-})();
-
-
-  </script>
 </body>
 </html>
