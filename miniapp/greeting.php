@@ -1,7 +1,8 @@
 <?php
+// miniapp/greeting.php
 session_start();
 
-/* Bootstrap: Telegram WebApp → session tg_id */
+/* ── 0) Bootstrap: Telegram WebApp → session tg_id ─────────────────────────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $data = json_decode(file_get_contents('php://input'), true);
   if (!empty($data['tg_id']) && ctype_digit((string)$data['tg_id'])) {
@@ -9,22 +10,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   exit;
 }
+
 if (!isset($_SESSION['tg_id'])) {
-  ?><!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Loading…</title></head><body>
+  ?>
+  <!DOCTYPE html><html lang="en"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Loading…</title></head><body>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
-    const tg = window.Telegram.WebApp; try{tg.expand();}catch(e){}
-    const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
-    if (!user) { document.body.innerHTML = '<p style="color:red">Cannot detect user ID</p>'; }
-    else {
-      fetch(location.href, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tg_id:user.id}) })
-      .then(()=>{ history.replaceState(null,'',location.pathname+location.search); location.reload(); });
+    const tg = window.Telegram?.WebApp; try { tg?.expand(); } catch(e){}
+    const user = tg?.initDataUnsafe?.user;
+    if (!user) {
+      document.body.innerHTML = '<p style="color:red">Cannot detect user ID</p>';
+    } else {
+      fetch(location.href, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tg_id: user.id })
+      }).then(()=>{ history.replaceState(null,'',location.pathname+location.search); location.reload(); });
     }
-  </script></body></html><?php
+  </script></body></html>
+  <?php
   exit;
 }
 
-/* App bootstrap */
+/* ── 1) App bootstrap ──────────────────────────────────────────────────────── */
 header('Content-Type: text/html; charset=UTF-8');
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
@@ -43,21 +52,33 @@ function initials(string $s): string {
   return $out ?: mb_strtoupper(mb_substr($s, 0, 1, 'UTF-8'), 'UTF-8');
 }
 
-/* Identify user */
-$tg_id = $_SESSION['tg_id'];
-$user  = getUserByTgId($tg_id);
+/* ── 2) Identify user (+ admin “view-as” via ?tg_id=) ─────────────────────── */
+$session_tg_id = (int)$_SESSION['tg_id'];
+$user          = getUserByTgId($session_tg_id);
 if (!$user) { http_response_code(400); exit('Error: invalid or unregistered Telegram ID'); }
 
+$tg_id = $session_tg_id;               // default: act as self
+if ($user['role'] === 'admin' && isset($_GET['tg_id']) && ctype_digit((string)$_GET['tg_id'])) {
+  $as_tg_id = (int)$_GET['tg_id'];
+  $as_user  = getUserByTgId($as_tg_id);
+  if ($as_user) {                      // only switch if target exists
+    $tg_id = $as_tg_id;
+    $user  = $as_user;
+  }
+}
+$impersonating = ($tg_id !== $session_tg_id);
+
 /* Odd/even + subgroup */
-$weekType = getCurrentWeekType();
+$weekType = getCurrentWeekType();      // 'odd' | 'even'
 $subgroup = $user['subgroup'] ?? null;
 
-/* Admin override group via GET (optional) */
-if ($user['role'] === 'admin' && isset($_GET['group_id'])) {
-  $g = intval($_GET['group_id']); if ($g > 0) $user['group_id'] = $g;
+/* Admin override group via GET (optional; useful while previewing) */
+if (($session_tg_id === $_SESSION['tg_id']) &&                       // sanity
+    isset($user['role']) && $user['role'] === 'admin' && isset($_GET['group_id'])) {
+  $g = (int)$_GET['group_id']; if ($g > 0) $user['group_id'] = $g;
 }
 
-/* View selection */
+/* ── 3) View selection ─────────────────────────────────────────────────────── */
 $when      = $_GET['when'] ?? 'today';
 $schedule  = [];
 $label     = '';
@@ -91,7 +112,7 @@ switch ($when) {
     $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $dayLabels = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-    $timeSlots = array_unique(array_column($all,'time_slot'));
+    $timeSlots = array_unique(array_column($all, 'time_slot'));
     usort($timeSlots, fn($a,$b)=> strtotime(substr($a,0,5)) - strtotime(substr($b,0,5)));
     foreach ($all as $r) { $grid[$r['time_slot']][$r['day_of_week']][] = $r; }
     break;
@@ -104,15 +125,16 @@ switch ($when) {
     break;
 }
 
-/* Initial table layout (for first paint) */
+/* ── 4) CSS: base (daily) + optional week overrides ───────────────────────── */
 $tableLayout = $_COOKIE['tableLayout'] ?? 'small'; // 'small' | 'big'
-
-/* CSS URLs (with cache-busting) */
-$baseUri     = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
+$baseUri     = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');  // e.g. /TG_Bot/miniapp
 $bigPath     = __DIR__ . '/tableb.css';
 $smallPath   = __DIR__ . '/tablec.css';
 $cssBigUrl   = $baseUri . '/tableb.css?v='   . (file_exists($bigPath)   ? filemtime($bigPath)   : time());
 $cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemtime($smallPath) : time());
+
+/* Carry impersonation through navigation if admin is viewing-as */
+$impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -121,9 +143,9 @@ $cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemt
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Welcome</title>
 
-<!-- Base styles ALWAYS on (daily + shared) -->
+<!-- Base styles ALWAYS (daily + shared) -->
 <link rel="stylesheet" href="<?= htmlspecialchars($cssSmallUrl, ENT_QUOTES) ?>" id="css-small" media="all">
-<!-- Week-grid overrides ONLY present on week view -->
+<!-- Week-grid overrides ONLY on week view -->
 <?php if ($when === 'week'): ?>
 <link rel="stylesheet" href="<?= htmlspecialchars($cssBigUrl, ENT_QUOTES) ?>" id="css-big"
       media="<?= ($tableLayout==='big') ? 'all' : 'not all' ?>">
@@ -152,17 +174,16 @@ $cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemt
   <?php endif; ?>
 
   <nav>
-    <a class="btn" href="?when=yesterday">← Yesterday</a>
-    <a class="btn" href="?when=today">Today</a>
-    <a class="btn" href="?when=tomorrow">Tomorrow →</a>
-    <a class="btn" href="?when=week">This Week</a>
+    <a class="btn" href="?when=yesterday<?= $impQ ?>">← Yesterday</a>
+    <a class="btn" href="?when=today<?= $impQ ?>">Today</a>
+    <a class="btn" href="?when=tomorrow<?= $impQ ?>">Tomorrow →</a>
+    <a class="btn" href="?when=week<?= $impQ ?>">This Week</a>
   </nav>
 
   <h2><?= htmlspecialchars($label, ENT_QUOTES) ?>’s Schedule</h2>
   <p>This is an <span class="week-type <?= $weekType ?>"><?= ucfirst($weekType) ?></span> week.</p>
 
 <?php if ($when === 'week'): ?>
-
   <?php if (empty($grid)): ?>
     <p>No classes scheduled this week.</p>
   <?php else: ?>
@@ -283,6 +304,7 @@ $cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemt
 
 <?php else: ?>
 
+  <!-- Daily / single-day table -->
   <table>
     <thead><tr><th>Time</th><th>Type</th><th>Subject</th><th>Location</th></tr></thead>
     <tbody>
@@ -313,9 +335,10 @@ $cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemt
     <?php if (in_array($user['role'], ['monitor','admin'], true)): ?>
       <a class="btn btn-primary" href="view_group_attendance.php?tg_id=<?= (int)$tg_id ?>&group_id=<?= (int)$user['group_id'] ?>">👥 View Group Attendance</a>
       <a class="btn btn-primary" href="export.php?tg_id=<?= (int)$tg_id ?>&group_id=<?= (int)$user['group_id'] ?>">📥 Export Attendance</a>
-      <?php if ($user['role'] === 'admin'): ?>
-        <a class="btn btn-primary" href="greeting.php?tg_id=348442139&group_id=2">Primary</a>
-        <a class="btn btn-primary" href="greeting.php?tg_id=878801928">Secondary</a>
+      <?php if ($session_tg_id === $_SESSION['tg_id'] && getUserByTgId($session_tg_id)['role'] === 'admin'): ?>
+        <!-- Quick “view as” shortcuts for the admin -->
+        <a class="btn btn-primary" href="greeting.php?tg_id=348442139<?= '&when=' . urlencode($when) ?>">Primary</a>
+        <a class="btn btn-primary" href="greeting.php?tg_id=878801928<?= '&when=' . urlencode($when) ?>">Secondary</a>
       <?php endif; ?>
     <?php endif; ?>
   </div>
@@ -334,13 +357,13 @@ $cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemt
   </script>
 
   <script>
-    // Big/Compact toggle logic — runs ONLY on week view (elements exist)
+    // Big/Compact toggle logic — only on week view
     const tableToggle = document.getElementById('table-toggle');
     const tableLabel  = document.getElementById('table-label');
     const cssBig      = document.getElementById('css-big');
 
     if (tableToggle && cssBig) {
-      const ANIM_MS = 260; // wait for thumb transition
+      const ANIM_MS = 260; // wait for the thumb transition
 
       function applyLayout(mode){
         cssBig.media = (mode === 'big') ? 'all' : 'not all';
@@ -352,14 +375,14 @@ $cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemt
         if (tableLabel) tableLabel.textContent = (mode === 'big') ? 'Big' : 'Compact';
       }
 
-      const stored = localStorage.getItem('tableLayout');
-      const initial = (stored === 'big' || stored === 'small') ? stored : (<?= json_encode($tableLayout) ?>);
+      const stored  = localStorage.getItem('tableLayout');
+      const initial = (stored === 'big' || stored === 'small') ? stored : <?= json_encode($tableLayout) ?>;
       setUI(initial); // cssBig.media is already set by PHP for first paint
 
       tableToggle.addEventListener('change', e => {
         const mode = e.target.checked ? 'big' : 'small';
-        setUI(mode);                // let the knob animate immediately
-        setTimeout(() => {          // swap CSS after the animation
+        setUI(mode);                // animate switch first
+        setTimeout(() => {          // then swap CSS
           applyLayout(mode);
         }, ANIM_MS);
       });
