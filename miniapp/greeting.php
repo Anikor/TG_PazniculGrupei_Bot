@@ -1,360 +1,395 @@
-﻿<?php
-// miniapp/greeting.php
-
-// ————————————————————————————————————————————————
-// 1 Bootstrap for Telegram Web App (no ?tg_id=… yet)
-// ————————————————————————————————————————————————
-if (!isset($_GET['tg_id'])): ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Loading…</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-</head>
-<body>
-<script>
-  // Wait for Telegram WebApp to initialize
-  const tg = window.Telegram.WebApp;
-  tg.expand();  // optional: make full-screen
-
-  // Grab user ID
-  const user = tg.initDataUnsafe && tg.initDataUnsafe.user;
-  if (!user) {
-    document.body.innerHTML = '<p style="color:red">Error: cannot detect Telegram user ID.</p>';
-  } else {
-    // Reload with ?tg_id=<your_id>
-    const url = new URL(location.href);
-    url.searchParams.set('tg_id', user.id);
-    location.replace(url.toString());
-  }
-</script>
-</body>
-</html>
 <?php
-  exit;
-endif;
+// miniapp/greeting.php
+session_start();
 
-// ————————————————————————————————————————————————
-// 2 Main greeting page (we now have ?tg_id=…)
-// ————————————————————————————————————————————————
+/* ── 0) Bootstrap: Telegram WebApp → session tg_id ─────────────────────────── */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  $data = json_decode(file_get_contents('php://input'), true);
+  if (!empty($data['tg_id']) && ctype_digit((string)$data['tg_id'])) {
+    $_SESSION['tg_id'] = (int)$data['tg_id'];
+  }
+  exit;
+}
+
+if (!isset($_SESSION['tg_id'])) {
+  ?>
+  <!DOCTYPE html><html lang="en"><head>
+    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Loading…</title></head><body>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    const tg = window.Telegram?.WebApp; try { tg?.expand(); } catch(e){}
+    const user = tg?.initDataUnsafe?.user;
+    if (!user) {
+      document.body.innerHTML = '<p style="color:red">Cannot detect user ID</p>';
+    } else {
+      fetch(location.href, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ tg_id: user.id })
+      }).then(()=>{ history.replaceState(null,'',location.pathname+location.search); location.reload(); });
+    }
+  </script></body></html>
+  <?php
+  exit;
+}
+
+/* ── 1) App bootstrap ──────────────────────────────────────────────────────── */
 header('Content-Type: text/html; charset=UTF-8');
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/oe_weeks.php';
 
-// Identify user
-$tg_id = intval($_GET['tg_id']);
-$user  = getUserByTgId($tg_id);
-if (!$user) {
-    http_response_code(400);
-    exit('Error: invalid or unregistered Telegram ID');
+/* Helpers */
+function initials(string $s): string {
+  $stop  = ['of','and','the','de','la','si','și','în','din','ale','a','cu'];
+  $parts = preg_split('/[\s\-]+/u', trim($s), -1, PREG_SPLIT_NO_EMPTY);
+  $out   = '';
+  foreach ($parts as $w) {
+    $lw = mb_strtolower($w, 'UTF-8');
+    if (in_array($lw, $stop, true)) continue;
+    $out .= mb_strtoupper(mb_substr($w, 0, 1, 'UTF-8'), 'UTF-8');
+  }
+  return $out ?: mb_strtoupper(mb_substr($s, 0, 1, 'UTF-8'), 'UTF-8');
 }
 
-// 2) allow admin to override which group we’re viewing
-if ($user['role'] === 'admin' && isset($_GET['group_id'])) {
-    $override = intval($_GET['group_id']);
-    if ($override > 0) {
-        // pretend our user belongs to the override group
-        $user['group_id'] = $override;
-    }
-}
+/* ── 2) Identify user (+ admin “view-as” via ?tg_id=) ─────────────────────── */
+$session_tg_id = (int)$_SESSION['tg_id'];
+$user          = getUserByTgId($session_tg_id);
+if (!$user) { http_response_code(400); exit('Error: invalid or unregistered Telegram ID'); }
 
-
-// Choose which date range to load
-$when = $_GET['when'] ?? 'today';
-switch ($when) {
-    case 'yesterday':
-        $date     = date('Y-m-d', strtotime('-1 day'));
-        $label    = 'Yesterday (' . date('d M Y', strtotime('-1 day')) . ')';
-        $schedule = getScheduleForDate($tg_id, $date);
-        break;
-    case 'tomorrow':
-        $date     = date('Y-m-d', strtotime('+1 day'));
-        $label    = 'Tomorrow (' . date('d M Y', strtotime('+1 day')) . ')';
-        $schedule = getScheduleForDate($tg_id, $date);
-        break;
-    case 'week':
-        $label    = 'This Week';
-        $schedule = getWeekSchedule($tg_id);
-        break;
-    case 'today':
-    default:
-        $date     = date('Y-m-d');
-        $label    = 'Today (' . date('d M Y') . ')';
-        $schedule = getScheduleForDate($tg_id, $date);
-        break;
-}
-
-// Helpers for weekly grid
-$dayLabels = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
-$timeSlots = array_unique(array_column($schedule, 'time_slot'));
-usort($timeSlots, fn($a,$b)=>
-    strtotime(explode('-',$a)[0]) - strtotime(explode('-',$b)[0])
-);
-$grid = [];
-if ($when === 'week') {
-  foreach ($schedule as $row) {
-    $grid[$row['time_slot']][$row['day_of_week']] = [
-      'type'     => $row['type'],
-      'subject'  => $row['subject'],
-      'location' => $row['location']
-    ];
+$tg_id = $session_tg_id;               // default: act as self
+if ($user['role'] === 'admin' && isset($_GET['tg_id']) && ctype_digit((string)$_GET['tg_id'])) {
+  $as_tg_id = (int)$_GET['tg_id'];
+  $as_user  = getUserByTgId($as_tg_id);
+  if ($as_user) {                      // only switch if target exists
+    $tg_id = $as_tg_id;
+    $user  = $as_user;
   }
 }
+$impersonating = ($tg_id !== $session_tg_id);
+
+/* Odd/even + subgroup */
+$weekType = getCurrentWeekType();      // 'odd' | 'even'
+$subgroup = $user['subgroup'] ?? null;
+
+/* Admin override group via GET (optional; useful while previewing) */
+if (($session_tg_id === $_SESSION['tg_id']) &&                       // sanity
+    isset($user['role']) && $user['role'] === 'admin' && isset($_GET['group_id'])) {
+  $g = (int)$_GET['group_id']; if ($g > 0) $user['group_id'] = $g;
+}
+
+/* ── 3) View selection ─────────────────────────────────────────────────────── */
+$when      = $_GET['when'] ?? 'today';
+$schedule  = [];
+$label     = '';
+$dayLabels = $timeSlots = $grid = [];
+
+switch ($when) {
+  case 'yesterday':
+    $date     = date('Y-m-d', strtotime('-1 day'));
+    $label    = 'Yesterday (' . date('d M Y', strtotime('-1 day')) . ')';
+    $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+    break;
+
+  case 'tomorrow':
+    $date     = date('Y-m-d', strtotime('+1 day'));
+    $label    = 'Tomorrow (' . date('d M Y', strtotime('+1 day')) . ')';
+    $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+    break;
+
+  case 'week':
+    $label = 'This Week';
+    $stmt = $pdo->prepare("
+      SELECT day_of_week, time_slot, type, subject, location, week_type
+        FROM schedule
+       WHERE group_id = ?
+         AND day_of_week IN ('Monday','Tuesday','Wednesday','Thursday','Friday')
+       ORDER BY
+         FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday'),
+         STR_TO_DATE(SUBSTRING_INDEX(time_slot,'-',1),'%H:%i')
+    ");
+    $stmt->execute([$user['group_id']]);
+    $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $dayLabels = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
+    $timeSlots = array_unique(array_column($all, 'time_slot'));
+    usort($timeSlots, fn($a,$b)=> strtotime(substr($a,0,5)) - strtotime(substr($b,0,5)));
+    foreach ($all as $r) { $grid[$r['time_slot']][$r['day_of_week']][] = $r; }
+    break;
+
+  case 'today':
+  default:
+    $date     = date('Y-m-d');
+    $label    = 'Today (' . date('d M Y') . ')';
+    $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+    break;
+}
+
+/* ── 4) CSS: base (daily) + optional week overrides ───────────────────────── */
+$tableLayout = $_COOKIE['tableLayout'] ?? 'small'; // 'small' | 'big'
+$baseUri     = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');  // e.g. /TG_Bot/miniapp
+$bigPath     = __DIR__ . '/tableb.css';
+$smallPath   = __DIR__ . '/tablec.css';
+$cssBigUrl   = $baseUri . '/tableb.css?v='   . (file_exists($bigPath)   ? filemtime($bigPath)   : time());
+$cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemtime($smallPath) : time());
+
+/* Carry impersonation through navigation if admin is viewing-as */
+$impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Welcome</title>
-  <style>
-    body { font-family:sans-serif; padding:1rem; }
-    h1 { margin-bottom:.2em; }
-    .role { color:#555; margin-bottom:1em; }
-    .nav-buttons a {
-      margin:0 .5em .5em 0;
-      padding:.5em 1em;
-      background:#eee; border-radius:4px;
-      text-decoration:none; color:#333;
-    }
-    table { width:100%; border-collapse:collapse; margin-top:1em; }
-    th, td {
-      border:1px solid #ccc; padding:.5em;
-      text-align:center; vertical-align:top;
-    }
-    thead th { background:#f5f5f5; }
-    .actions a {
-      display:inline-block; margin-right:1em; margin-top:1em;
-      padding:.6em 1.2em; background:#2a9df4;
-      color:white; text-decoration:none; border-radius:4px;
-    }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Welcome</title>
 
-     :root {
-    --bg: #ffffff;
-    --fg: #000000;
-    --link-bg: #eee;
-    --link-fg: #000;
-    --btn-bg: #2a9df4;
-    --btn-fg: #fff;
-    --border: #ccc;
-    --section-bg: #f5f5f5;
-  }
+<!-- Base styles ALWAYS (daily + shared) -->
+<link rel="stylesheet" href="<?= htmlspecialchars($cssSmallUrl, ENT_QUOTES) ?>" id="css-small" media="all">
+<!-- Week-grid overrides ONLY on week view -->
+<?php if ($when === 'week'): ?>
+<link rel="stylesheet" href="<?= htmlspecialchars($cssBigUrl, ENT_QUOTES) ?>" id="css-big"
+      media="<?= ($tableLayout==='big') ? 'all' : 'not all' ?>">
+<?php endif; ?>
 
-  /* 2. Dark theme overrides */
-  .dark-theme {
-    --bg: #2b2d2f;
-    --fg: #e2e2e4;
-    --link-bg: #3b3f42;
-    --link-fg: #e2e2e4;
-    --btn-bg: #1a73e8;
-    --btn-fg: #fff;
-    --border: #444;
-    --section-bg: #3b3f42;
-  }
-
-  /* 3. Apply variables */
-  body {
-    background-color: var(--bg);
-    color: var(--fg);
-  }
-  a {
-    color: var(--link-fg);
-    background: var(--link-bg);
-    padding: .4em .8em;
-    border-radius: 4px;
-    text-decoration: none;
-    margin: 0 .4em .4em 0;
-    display: inline-block;
-  }
-  .actions a, .btn-submit {
-    background: var(--btn-bg);
-    color: var(--btn-fg);
-  }
-  table, th, td {
-    border-color: var(--border);
-  }
-  thead th {
-    background: var(--section-bg);
-  }
-
-   .switch {
-      position:relative;
-      display:inline-block;
-      width:50px;
-      height:24px;
-    }
-    .switch input {
-      opacity:0;
-      width:0; height:0;
-    }
-    .slider {
-      position:absolute;
-      cursor:pointer;
-      top:0; left:0; right:0; bottom:0;
-      background-color:#ef5350;
-      transition:.4s;
-      border-radius:24px;
-    }
-    .slider:before {
-      position:absolute;
-      content:"";
-      height:18px; width:18px;
-      left:3px; bottom:3px;
-      background:white;
-      transition:.4s;
-      border-radius:50%;
-    }
-    input:checked + .slider {
-      background-color:#66bb6a;
-    }
-    input:checked + .slider:before {
-      transform:translateX(26px);
-    }
-
-  </style>
 </head>
-<body>
-<div class="theme-toggle">
+<body class="<?= (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark-theme' : '' ?>">
+
+  <!-- Theme toggle -->
   <label class="switch">
-    <input type="checkbox" id="theme-toggle">
-    <span class="slider"></span>
+    <input type="checkbox" id="theme-toggle"><span class="slider"></span>
   </label>
   <span id="theme-label">Light</span>
-</div>
 
-  <h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
-  <div class="role">
-    Role: <strong><?= htmlspecialchars(ucfirst($user['role']), ENT_QUOTES) ?></strong>
-  </div>
+  <!-- Big/Compact toggle — ONLY on week view -->
+  <?php if ($when === 'week'): ?>
+  <label class="switch" style="margin-left:.75rem">
+    <input type="checkbox" id="table-toggle"><span class="slider"></span>
+  </label>
+  <span id="table-label"><?= ($tableLayout==='big') ? 'Big' : 'Compact' ?></span>
+  <?php endif; ?>
 
-  <div class="nav-buttons">
-    <a href="?tg_id=<?= $tg_id ?>&when=yesterday">← Yesterday</a>
-    <a href="?tg_id=<?= $tg_id ?>&when=today">Today</a>
-    <a href="?tg_id=<?= $tg_id ?>&when=tomorrow">Tomorrow →</a>
-    <a href="?tg_id=<?= $tg_id ?>&when=week">This Week</a>
-  </div>
+  <br><br><br><h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
+  <?php if ($user['role'] !== 'student'): ?>
+    <p>Role: <strong><?= ucfirst(htmlspecialchars($user['role'])) ?></strong></p>
+  <?php endif; ?>
 
-  <h2><?= $label ?>’s Schedule</h2>
+  <nav>
+    <a class="btn" href="?when=yesterday<?= $impQ ?>">← Yesterday</a>
+    <a class="btn" href="?when=today<?= $impQ ?>">Today</a>
+    <a class="btn" href="?when=tomorrow<?= $impQ ?>">Tomorrow →</a>
+    <a class="btn" href="?when=week<?= $impQ ?>">This Week</a>
+  </nav>
 
-  <?php if (empty($schedule)): ?>
-    <p>No classes scheduled.</p>
+  <h2><?= htmlspecialchars($label, ENT_QUOTES) ?>’s Schedule</h2>
+  <p>This is an <span class="week-type <?= $weekType ?>"><?= ucfirst($weekType) ?></span> week.</p>
 
-  <?php elseif ($when === 'week'): ?>
-    <table>
+<?php if ($when === 'week'): ?>
+  <?php if (empty($grid)): ?>
+    <p>No classes scheduled this week.</p>
+  <?php else: ?>
+    <table class="schedule-table">
+      <colgroup>
+        <col class="col-time">
+        <?php for ($i=0; $i<count($dayLabels); $i++): ?><col class="col-day"><?php endfor; ?>
+      </colgroup>
       <thead>
         <tr>
-          <th>Time / Day</th>
-          <?php foreach ($dayLabels as $day): ?>
-            <th><?= htmlspecialchars($day, ENT_QUOTES) ?></th>
-          <?php endforeach; ?>
+          <th>Time</th>
+          <?php foreach ($dayLabels as $d): ?><th><?= htmlspecialchars($d, ENT_QUOTES) ?></th><?php endforeach; ?>
         </tr>
       </thead>
+      <?php
+      $filteredSlots = array_filter($timeSlots, function($slot) use ($dayLabels, $grid) {
+        foreach ($dayLabels as $d) if (!empty($grid[$slot][$d])) return true;
+        return false;
+      });
+      ?>
       <tbody>
-        <?php foreach ($timeSlots as $slot): ?>
-          <tr>
-            <td><?= htmlspecialchars($slot, ENT_QUOTES) ?></td>
-            <?php foreach ($dayLabels as $day): ?>
-              <td>
-                <?php if (!empty($grid[$slot][$day])): 
-                  $c = $grid[$slot][$day]; ?>
-                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>. 
-                  <?= htmlspecialchars($c['subject'],ENT_QUOTES) ?><br>
-                  <small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small>
-                <?php endif; ?>
+      <?php foreach ($filteredSlots as $slot): ?>
+        <tr>
+          <td rowspan="2"><?= htmlspecialchars($slot, ENT_QUOTES) ?></td>
+          <?php foreach ($dayLabels as $d):
+            $cells = $grid[$slot][$d] ?? [];
+            $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
+            $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
+            $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
+          ?>
+            <?php if (count($full)): $c = reset($full); ?>
+              <td rowspan="2" class="week-cell">
+                <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                <?php $subject = $c['subject']; ?>
+                <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                  <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                  <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>"><?= htmlspecialchars(initials($subject)) ?></abbr>
+                </span><br>
+                <?php if (!empty($c['location'])): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><?php endif; ?>
               </td>
-            <?php endforeach; ?>
-          </tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
+            <?php elseif (count($odd) && count($even)): ?>
+              <td class="week-cell odd">
+                <?php foreach ($odd as $c): ?>
+                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                  <?php $subject = $c['subject']; ?>
+                  <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                    <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                    <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>"><?= htmlspecialchars(initials($subject)) ?></abbr>
+                  </span><br>
+                  <?php if (!empty($c['location'])): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
+            <?php elseif (count($odd)): ?>
+              <td class="week-cell odd">
+                <?php foreach ($odd as $c): ?>
+                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                  <?php $subject = $c['subject']; ?>
+                  <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                    <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                    <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>"><?= htmlspecialchars(initials($subject)) ?></abbr>
+                  </span><br>
+                  <?php if (!empty($c['location'])): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
+            <?php else: ?>
+              <td>&nbsp;</td>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        </tr>
 
-  <?php else: ?>
-    <table>
-      <thead>
-        <tr><th>Time</th><th>Type</th><th>Subject</th><th>Location</th></tr>
-      </thead>
-      <tbody>
-        <?php foreach ($schedule as $row): ?>
-          <tr>
-            <td><?= htmlspecialchars($row['time_slot'],ENT_QUOTES) ?></td>
-            <td><?= htmlspecialchars($row['type'],ENT_QUOTES) ?></td>
-            <td><?= htmlspecialchars($row['subject'],ENT_QUOTES) ?></td>
-            <td><?= htmlspecialchars($row['location'],ENT_QUOTES) ?></td>
-          </tr>
-        <?php endforeach; ?>
+        <tr>
+          <?php foreach ($dayLabels as $d):
+            $cells = $grid[$slot][$d] ?? [];
+            $full  = array_filter($cells, fn($c)=> $c['week_type'] === null);
+            $odd   = array_filter($cells, fn($c)=> $c['week_type'] === 'odd');
+            $even  = array_filter($cells, fn($c)=> $c['week_type'] === 'even');
+          ?>
+            <?php if (count($full)): ?>
+              <?php continue; ?>
+            <?php elseif (count($odd) && count($even)): ?>
+              <td class="week-cell even">
+                <?php foreach ($even as $c): ?>
+                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                  <?php $subject = $c['subject']; ?>
+                  <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                    <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                    <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>"><?= htmlspecialchars(initials($subject)) ?></abbr>
+                  </span><br>
+                  <?php if (!empty($c['location'])): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
+            <?php elseif (count($even)): ?>
+              <td class="week-cell even">
+                <?php foreach ($even as $c): ?>
+                  <?= htmlspecialchars($c['type'],ENT_QUOTES) ?>.
+                  <?php $subject = $c['subject']; ?>
+                  <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+                    <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+                    <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>"><?= htmlspecialchars(initials($subject)) ?></abbr>
+                  </span><br>
+                  <?php if (!empty($c['location'])): ?><small><?= htmlspecialchars($c['location'],ENT_QUOTES) ?></small><br><?php endif; ?>
+                <?php endforeach; ?>
+              </td>
+            <?php else: ?>
+              <td>&nbsp;</td>
+            <?php endif; ?>
+          <?php endforeach; ?>
+        </tr>
+
+      <?php endforeach; ?>
       </tbody>
     </table>
   <?php endif; ?>
 
-  <div class="actions">
-    <?php if (in_array($user['role'], ['admin','monitor','moderator'])): ?>
-      <a href="index.html?tg_id=<?= $tg_id ?>&when=<?= urlencode($when) ?>">
-        📝 Log Attendance
-      </a>
+<?php elseif (empty($schedule)): ?>
+
+  <p>No classes scheduled <?= $when === 'today' ? 'today' : 'for ' . htmlspecialchars($when, ENT_QUOTES) ?>.</p>
+
+<?php else: ?>
+
+  <!-- Daily / single-day table -->
+  <table>
+    <thead><tr><th>Time</th><th>Type</th><th>Subject</th><th>Location</th></tr></thead>
+    <tbody>
+      <?php foreach ($schedule as $r): ?>
+        <tr>
+          <td><?= htmlspecialchars($r['time_slot'], ENT_QUOTES) ?></td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>><?= htmlspecialchars($r['type'], ENT_QUOTES) ?></td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
+            <?php $subject = $r['subject']; ?>
+            <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
+              <span class="subject-full"><?= htmlspecialchars($subject) ?></span>
+              <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>"><?= htmlspecialchars(initials($subject)) ?></abbr>
+            </span>
+          </td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>><?= htmlspecialchars($r['location'] ?? '', ENT_QUOTES) ?></td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+
+<?php endif; ?>
+
+  <div style="margin-top:1rem;">
+    <?php if (in_array($user['role'], ['admin','monitor','moderator'], true)): ?>
+      <a class="btn btn-primary" href="index.php?tg_id=<?= (int)$tg_id ?>&when=<?= urlencode($when) ?>">📝 Log Attendance</a>
     <?php endif; ?>
-
-    <a href="view_attendance.php?tg_id=<?= $tg_id ?>">
-      📊 View My Attendance
-    </a>
-
-    <!-- only monitors may see this now -->
- <?php if ( in_array($user['role'], ['monitor','admin'], true) ): ?>
-  <a
-    href="view_group_attendance.php?tg_id=<?= urlencode($tg_id) ?>&group_id=<?= urlencode($user['group_id']) ?>"
-    class="btn btn-primary"
-  >
-    👥 View Group Attendance
-  </a>
-  
-<?php endif; ?>
-
-<?php if ($user['role'] === 'admin'): ?>
-  <div class="btn-group" role="group" aria-label="Admin switch">
-    <!-- Primary: log in as Karina in AI‑241 -->
-    <a href="greeting.php?tg_id=348442139&group_id=2" class="btn btn-primary">
-      Primary
-    </a>
-    <!-- Secondary: log in as the AI‑241 monitor/admin -->
-    <a href="greeting.php?tg_id=878801928" class="btn btn-secondary">
-      Secondary
-    </a>
-<?php endif; ?>
-<?php if (in_array($user['role'], ['admin','monitor'], true)): ?>
-      <a href="export.php?tg_id=<?= $tg_id ?>&group_id=<?= $user['group_id'] ?>" class="btn btn-primary">
-        📥 Export Attendance
-      </a>
-
-  </div>
-<?php endif; ?>
-
+    <a class="btn btn-primary" href="view_attendance.php?tg_id=<?= (int)$tg_id ?>">📊 View My Attendance</a>
+    <?php if (in_array($user['role'], ['monitor','admin'], true)): ?>
+      <a class="btn btn-primary" href="view_group_attendance.php?tg_id=<?= (int)$tg_id ?>&group_id=<?= (int)$user['group_id'] ?>">👥 View Group Attendance</a>
+      <a class="btn btn-primary" href="export.php?tg_id=<?= (int)$tg_id ?>&group_id=<?= (int)$user['group_id'] ?>">📥 Export Attendance</a>
+      <?php if ($session_tg_id === $_SESSION['tg_id'] && getUserByTgId($session_tg_id)['role'] === 'admin'): ?>
+        <!-- Quick “view as” shortcuts for the admin -->
+        <a class="btn btn-primary" href="greeting.php?tg_id=348442139<?= '&when=' . urlencode($when) ?>">Primary</a>
+        <a class="btn btn-primary" href="greeting.php?tg_id=878801928<?= '&when=' . urlencode($when) ?>">Secondary</a>
+      <?php endif; ?>
+    <?php endif; ?>
   </div>
 
   <script>
-  // 1 Grab toggle & label
-  const toggle = document.getElementById('theme-toggle');
-  const label  = document.getElementById('theme-label');
+    // Theme toggle
+    const themeToggle = document.getElementById('theme-toggle');
+    const themeLabel  = document.getElementById('theme-label');
+    const body        = document.body;
+    let currentTheme  = localStorage.getItem('theme') || 'light';
+    if (currentTheme === 'dark') { body.classList.add('dark-theme'); themeToggle.checked = true; themeLabel.textContent = 'Dark'; }
+    themeToggle.addEventListener('change', e => {
+      if (e.target.checked) { body.classList.add('dark-theme'); localStorage.setItem('theme','dark'); document.cookie='theme=dark;path=/;max-age='+60*60*24*365; themeLabel.textContent='Dark'; }
+      else { body.classList.remove('dark-theme'); localStorage.setItem('theme','light'); document.cookie='theme=light;path=/;max-age='+60*60*24*365; themeLabel.textContent='Light'; }
+    });
+  </script>
 
-  // 2 Initialize from localStorage (default = light)
-  const saved = localStorage.getItem('theme') || 'light';
-  if (saved === 'dark') {
-    document.body.classList.add('dark-theme');
-    toggle.checked = true;
-    label.textContent = 'Dark';
-  }
+  <script>
+    // Big/Compact toggle logic — only on week view
+    const tableToggle = document.getElementById('table-toggle');
+    const tableLabel  = document.getElementById('table-label');
+    const cssBig      = document.getElementById('css-big');
 
-  // 3 On toggle → switch class & save
-  toggle.addEventListener('change', () => {
-    if (toggle.checked) {
-      document.body.classList.add('dark-theme');
-      localStorage.setItem('theme','dark');
-      label.textContent = 'Dark';
-    } else {
-      document.body.classList.remove('dark-theme');
-      localStorage.setItem('theme','light');
-      label.textContent = 'Light';
+    if (tableToggle && cssBig) {
+      const ANIM_MS = 260; // wait for the thumb transition
+
+      function applyLayout(mode){
+        cssBig.media = (mode === 'big') ? 'all' : 'not all';
+        localStorage.setItem('tableLayout', mode);
+        document.cookie = 'tableLayout=' + encodeURIComponent(mode) + ';path=/;max-age=' + (60*60*24*365);
+      }
+      function setUI(mode){
+        tableToggle.checked = (mode === 'big');
+        if (tableLabel) tableLabel.textContent = (mode === 'big') ? 'Big' : 'Compact';
+      }
+
+      const stored  = localStorage.getItem('tableLayout');
+      const initial = (stored === 'big' || stored === 'small') ? stored : <?= json_encode($tableLayout) ?>;
+      setUI(initial); // cssBig.media is already set by PHP for first paint
+
+      tableToggle.addEventListener('change', e => {
+        const mode = e.target.checked ? 'big' : 'small';
+        setUI(mode);                // animate switch first
+        setTimeout(() => {          // then swap CSS
+          applyLayout(mode);
+        }, ANIM_MS);
+      });
     }
-  });
-</script>
+
+    try { window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.expand(); } catch(e){}
+  </script>
+
 </body>
 </html>
