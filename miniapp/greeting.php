@@ -141,8 +141,6 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Welcome</title>
-
 <!-- Base styles ALWAYS (daily + shared) -->
 <link rel="stylesheet" href="<?= htmlspecialchars($cssSmallUrl, ENT_QUOTES) ?>" id="css-small" media="all">
 <!-- Week-grid overrides ONLY on week view -->
