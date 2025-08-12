@@ -1,0 +1,93 @@
+/* tablec.css — BASE (daily + shared) + switches */
+
+/* Keep tables as tables on narrow screens */
+table{display:table!important;width:100%!important;table-layout:auto!important}
+thead{display:table-header-group!important}
+tbody{display:table-row-group!important}
+tr{display:table-row!important}
+th,td{display:table-cell!important;position:static!important}
+
+/* Colors & variables */
+:root{
+  --bg:#fff;--fg:#000;--link-bg:#eee;--link-fg:#000;
+  --btn-bg:#2a9df4;--btn-fg:#fff;--border:#ccc;--sec-bg:#f5f5f5;
+  --even-bg:#e6f7e6;--even-fg:#155724;--odd-bg:#fff9e6;--odd-fg:#856404;
+  --slot-h:84px; /* used by week rows (tableb.css) */
+}
+.dark-theme{
+  --bg:#2b2d2f;--fg:#e2e2e4;--link-bg:#3b3f42;--link-fg:#e2e2e4;
+  --btn-bg:#1a73e8;--btn-fg:#fff;--border:#444;--sec-bg:#3b3f42;
+  --even-bg:#264d26;--even-fg:#d4edda;--odd-bg:#665500;--odd-fg:#fff3cd;
+}
+
+/* Base */
+body{margin:0;padding:1rem;font-family:sans-serif;background:var(--bg);color:var(--fg)}
+h1{margin-top:0} h3{margin-bottom:0} p{margin:.5em 0 1em}
+
+/* Links & buttons */
+a{display:inline-block;margin:0 .5em .5em 0;padding:.5em 1em;border-radius:4px;background:var(--link-bg);color:var(--link-fg);text-decoration:none}
+.btn-primary{background:var(--btn-bg);color:var(--btn-fg)}
+.btn-secondary{background:var(--sec-bg);color:var(--fg)}
+
+/* Tables (daily & week share these) */
+table{border-collapse:collapse;width:100%!important;margin-top:1rem}
+th,td{border:1px solid var(--border);padding:.5em;text-align:center;vertical-align:middle}
+thead th{background:var(--sec-bg)}
+
+/* Week grid base */
+.schedule-table{width:100%;table-layout:fixed;border-collapse:collapse}
+.schedule-table th,.schedule-table td{
+  padding:8px; box-sizing:border-box; text-align:center; vertical-align:middle;
+  white-space:normal; word-break:normal; overflow-wrap:break-word;
+}
+thead th{white-space:nowrap; word-break:normal; overflow-wrap:normal}
+
+/* Column sizing via COLGROUP — base: time capped, days flexible */
+.schedule-table col.col-time{ width:60px; }
+.schedule-table col.col-day{ width:auto; }
+
+/* Week type & colored cells */
+.week-type{display:inline-block;padding:.2em .3em;border-radius:4px;font-weight:bold}
+.week-type.even{background:var(--even-bg);color:var(--even-fg)}
+.week-type.odd{background:var(--odd-bg);color:var(--odd-fg)}
+.week-cell{border-radius:4px}
+.week-cell.even{background:var(--even-bg);color:var(--even-fg)}
+.week-cell.odd{background:var(--odd-bg);color:var(--odd-fg)}
+
+/* SWITCHES (only here to avoid conflicts) */
+.switch{position:relative;display:inline-block;width:50px;height:24px;margin-right:.5rem;vertical-align:middle}
+.switch input{opacity:0;width:0;height:0;position:absolute;inset:0}
+.slider{position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:24px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1);transition:background-color .25s, box-shadow .25s}
+.slider:before{content:"";position:absolute;left:3px;bottom:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .25s}
+.switch input:checked + .slider{background:#66bb6a}
+.switch input:checked + .slider:before{transform:translateX(26px)}
+#theme-label{margin-left:.5rem;vertical-align:middle}
+
+/* Remove dotted underline on initials */
+abbr.subject-short{text-decoration:none;border-bottom:0;cursor:default}
+abbr.subject-short:hover,abbr.subject-short:focus{text-decoration:none;border-bottom:0}
+
+/* SUBJECT FULL/SHORT SWITCH */
+.subject-short{display:none}
+@media (max-width:610px){
+  .subject-full{display:none}
+  .subject-short{display:inline}
+}
+
+/* Small screens (≤610px): shorten weekday headers + compact cell padding */
+@media (max-width:610px){
+  .schedule-table thead th{position:relative;font-size:0;line-height:1;padding:4px}
+  .schedule-table thead th:nth-child(1){font-size:inherit}
+  .schedule-table thead th:nth-child(2)::after{content:"Mon."}
+  .schedule-table thead th:nth-child(3)::after{content:"Tue."}
+  .schedule-table thead th:nth-child(4)::after{content:"Wed."}
+  .schedule-table thead th:nth-child(5)::after{content:"Thu."}
+  .schedule-table thead th:nth-child(6)::after{content:"Fri."}
+  .schedule-table thead th::after{font-size:15px}
+
+  .schedule-table{font-size:15px}
+  .schedule-table td{padding:4px;line-height:1.15}
+  .schedule-table small{font-size:.8em}
+
+  .schedule-table col.col-time{width:52px}
+}
