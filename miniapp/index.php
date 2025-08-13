@@ -1,31 +1,14 @@
 ﻿<?php
-// miniapp/index.php
-// Fully inlined page that: (1) saves attendance via JSON POST,
-// (2) renders current day with prior marks, including "By ..." and optional
-//     "Last edited by ... at ...", and
-// (3) turns "Submit Attendance" into "Edit Attendance" on-the-fly after save.
-
-/* ─────────────────────────────────────────────────────────────
-   Includes
-   ────────────────────────────────────────────────────────────*/
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/oe_weeks.php';
 
-/* ─────────────────────────────────────────────────────────────
-   CORS / preflight (so fetch() works from anywhere you embed)
-   ────────────────────────────────────────────────────────────*/
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 
-/* ─────────────────────────────────────────────────────────────
-   JSON SAVE endpoint
-   Expect:
-     URL:   index.php?tg_id=...&offset=...
-     Body:  {"attendance":[{schedule_id,user_id,present,motivated,motivation},...]}
-   ────────────────────────────────────────────────────────────*/
+/* JSON SAVE */
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
     && str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
 
@@ -42,28 +25,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
   $tg_id = (int)($_GET['tg_id'] ?? 0);
   $user  = getUserByTgId($tg_id);
-
   if (!$user) {
     http_response_code(400);
     echo json_encode(['success' => false, 'error' => 'Unknown user']);
     exit;
   }
 
-  // Compute date from offset
   $offset = (int)($_GET['offset'] ?? 0);
   $date   = date('Y-m-d', strtotime("$offset days"));
 
-  // Insert rows
   $stmt = $pdo->prepare("
-      INSERT INTO attendance
-        (user_id, schedule_id, date, present, motivated, motivation, marked_by)
-      VALUES
-        (:uid, :sid, :dt, :pres, :mot, :reason, :mb)
+    INSERT INTO attendance
+      (user_id, schedule_id, date, present, motivated, motivation, marked_by)
+    VALUES
+      (:uid, :sid, :dt, :pres, :mot, :reason, :mb)
   ");
 
   try {
     $pdo->beginTransaction();
-
     foreach ($data['attendance'] as $r) {
       $stmt->execute([
         ':uid'    => (int)$r['user_id'],
@@ -75,12 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
         ':mb'     => (int)$user['id'],
       ]);
     }
-
     $pdo->commit();
-
     echo json_encode([
       'success' => true,
-      // echo back who marked + the date so the client can update UI instantly
       'marked_by_name' => $user['name'] ?? 'Unknown',
       'date' => $date,
     ]);
@@ -92,9 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
   exit;
 }
 
-/* ─────────────────────────────────────────────────────────────
-   PAGE RENDER (GET)
-   ────────────────────────────────────────────────────────────*/
+/* PAGE RENDER */
 $tg_id  = (int)($_GET['tg_id']  ?? 0);
 $offset = (int)($_GET['offset'] ?? 0);
 $date   = date('Y-m-d', strtotime("$offset days"));
@@ -109,33 +83,24 @@ $prev1 = $offset - 1;
 $prev2 = $offset - 2;
 $next1 = $offset + 1;
 
-// Teacher/monitor
 $user = getUserByTgId($tg_id) ?: exit('Invalid user');
 
-// Academic odd/even computed from semester logic
 $dt = new DateTime($date, new DateTimeZone('Europe/Chisinau'));
 [, , , $weekType] = computeSemesterAndWeek($dt);
 
-// Load lessons for this academic weekType
 $schedule = getScheduleForDate($tg_id, $date, $weekType);
-
-// Students in group
 $students = getGroupStudents($user['group_id']);
 
-// Existing attendance for THIS date + these schedule slots
 $sids     = array_column($schedule, 'id');
 $existing = [];
-$markers  = []; // user_id => name
+$markers  = [];
 
 if ($sids) {
   $in = implode(',', array_fill(0, count($sids), '?'));
-
-  // Note: updated_at, updated_by are optional but supported if present
   $q = "SELECT schedule_id,user_id,present,motivated,motivation,marked_by,updated_at,updated_by
           FROM attendance
          WHERE date=?
            AND schedule_id IN ($in)";
-
   $stmt = $pdo->prepare($q);
   $stmt->execute(array_merge([$date], $sids));
 
@@ -145,8 +110,6 @@ if ($sids) {
     if (!empty($r['marked_by'])) $teacherIds[] = (int)$r['marked_by'];
     if (!empty($r['updated_by'])) $teacherIds[] = (int)$r['updated_by'];
   }
-
-  // Resolve names for "By ..." and "Last edited by ..."
   if ($teacherIds) {
     $teacherIds = array_values(array_unique($teacherIds));
     $in2  = implode(',', array_fill(0, count($teacherIds), '?'));
@@ -158,36 +121,29 @@ if ($sids) {
   }
 }
 
-// Group name
 $stmG = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
 $stmG->execute([$user['group_id']]);
 $grp       = $stmG->fetch(PDO::FETCH_ASSOC);
 $groupName = $grp['name'] ?? ('Group ' . $user['group_id']);
 
+/* Server-paint theme to prevent flicker */
+$theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="<?= $theme==='dark' ? 'dark-theme' : '' ?>">
 <head>
-  <link rel=\"stylesheet\" href=\"style.css\">
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Log Attendance</title>
-
-<script>
-try {
-  const html = document.documentElement;
-  html.classList.add('js-ready');
-  if (localStorage.getItem('theme') === 'dark') {
-    html.classList.add('dark-theme');
-  }
-} catch (e) {}
-</script>
-
-
-
-<link rel="stylesheet" href="style.css?v=20250812-144425">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Log Attendance</title>
+  <link rel="stylesheet" href="style.css?v=1">
+  <script src="script.js?v=nav-global-2" defer></script>
 </head>
-<body>
+<body
+  data-day-label="<?= htmlspecialchars($dayLabel, ENT_QUOTES) ?>"
+  data-date-dmy="<?= htmlspecialchars(date('d.m.Y', strtotime($date)), ENT_QUOTES) ?>"
+  data-current-user-name="<?= htmlspecialchars($user['name'] ?? 'Unknown', ENT_QUOTES) ?>"
+  data-tg-id="<?= (int)$tg_id ?>"
+>
 <br>
 <!-- Theme toggle -->
 <div id="theme-switch">
@@ -220,7 +176,6 @@ try {
   <p style="color:red;font-weight:bold;">
     No lessons for <?= $dayLabel ?> (<?= date('d.m.Y', strtotime($date)) ?>).
   </p>
-
 <?php else: ?>
   <table>
     <thead>
@@ -240,7 +195,6 @@ try {
         <tr>
           <td><?= $i+1 ?></td>
           <td><?= htmlspecialchars($stu['name'], ENT_QUOTES) ?></td>
-
           <?php foreach ($schedule as $s): ?>
             <td>
               <?php if (isset($existing[$s['id']][$stu['id']])): 
@@ -264,38 +218,26 @@ try {
                   <?php endif; ?>
                 </div>
               <?php else: ?>
-                <!-- New (not yet saved) -->
                 <label class="switch">
-                  <input type="checkbox"
-                         class="att-toggle"
-                         id="att_<?= $s['id'] ?>_<?= $stu['id'] ?>">
+                  <input type="checkbox" class="att-toggle" id="att_<?= $s['id'] ?>_<?= $stu['id'] ?>">
                   <span class="slider"></span>
                 </label>
-
                 <div class="mot-container" id="mot_cont_<?= $s['id'] ?>_<?= $stu['id'] ?>">
                   <label>
-                    <input type="checkbox"
-                           class="mot-toggle"
-                           id="mot_<?= $s['id'] ?>_<?= $stu['id'] ?>">
+                    <input type="checkbox" class="mot-toggle" id="mot_<?= $s['id'] ?>_<?= $stu['id'] ?>">
                     Motivated
                   </label>
-                  <input type="text"
-                         id="mot_text_<?= $s['id'] ?>_<?= $stu['id'] ?>"
-                         class="motiv-text"
-                         placeholder="Reason…">
+                  <input type="text" id="mot_text_<?= $s['id'] ?>_<?= $stu['id'] ?>" class="motiv-text" placeholder="Reason…">
                 </div>
               <?php endif; ?>
             </td>
           <?php endforeach; ?>
-
         </tr>
       <?php endforeach; ?>
     </tbody>
   </table>
 
-  <div id="save-confirm">
-    ✅ Attendance saved for <?= date('d.m.Y', strtotime($date)) ?>!
-  </div>
+  <div id="save-confirm">✅ Attendance saved for <?= date('d.m.Y', strtotime($date)) ?>!</div>
 
   <?php if (empty($existing)): ?>
     <button class="btn-submit">Submit Attendance</button>
@@ -306,189 +248,5 @@ try {
   <?php endif; ?>
 
 <?php endif; ?>
-
-<script>
-/* ─────────────────────────────────────────────────────────────
-   Tiny helpers
-   ────────────────────────────────────────────────────────────*/
-const CURRENT_USER_NAME = <?= json_encode($user['name'] ?? 'Unknown') ?>;
-
-function escapeHtml(str){
-  return String(str).replace(/[&<>"']/g, s => (
-    {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]
-  ));
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Navigation
-   ────────────────────────────────────────────────────────────*/
-function nav(off){
-  location.search = `?tg_id=<?= $tg_id ?>&offset=${off}`;
-}
-
-/* ─────────────────────────────────────────────────────────────
-   Theme toggle
-   ────────────────────────────────────────────────────────────*/
-const toggle = document.getElementById('theme-toggle');
-const label  = document.getElementById('theme-label');
-const root   = document.documentElement;
-
-// initialize from localStorage
-(() => {
-  const saved = localStorage.getItem('theme') || 'light';
-  root.classList.toggle('dark-theme', saved === 'dark');
-  label.textContent = saved === 'dark' ? 'Dark' : 'Light';
-  toggle.checked = (saved === 'dark');
-})();
-
-toggle.addEventListener('change', () => {
-  const isDark = toggle.checked;
-  root.classList.toggle('dark-theme', isDark);
-  label.textContent = isDark ? 'Dark' : 'Light';
-  localStorage.setItem('theme', isDark ? 'dark' : 'light');
-});
-
-/* ─────────────────────────────────────────────────────────────
-   Interactive toggles (present/motivated)
-   ────────────────────────────────────────────────────────────*/
-document.querySelectorAll('.att-toggle').forEach(chk=>{
-  chk.addEventListener('change', ()=>{
-    const id   = chk.id.replace('att_','');
-    const cont = document.getElementById('mot_cont_'+id);
-    if (cont) cont.style.display = chk.checked ? 'none' : 'block';
-  });
-});
-
-// Motivation text only shows when "Motivated" checked
-document.querySelectorAll('.mot-toggle').forEach(chk=>{
-  chk.addEventListener('change', ()=>{
-    const id  = chk.id.replace('mot_','');
-    const txt = document.getElementById('mot_text_'+id);
-    if (!txt) return;
-    if (chk.checked) txt.style.display='block';
-    else { txt.style.display='none'; txt.value=''; }
-  });
-});
-
-// Initialize motivation inputs visibility
-document.querySelectorAll('.mot-toggle').forEach(chk=>{
-  const id  = chk.id.replace('mot_','');
-  const txt = document.getElementById('mot_text_'+id);
-  if (!txt) return;
-  if (chk.checked) txt.style.display='block';
-  else { txt.style.display='none'; txt.value=''; }
-});
-
-/* ─────────────────────────────────────────────────────────────
-   Submit via AJAX
-   On success:
-     - show green banner
-     - transform the button into "Edit Attendance" (no refresh)
-     - freeze each cell like saved state and add "By <name>"
-   ────────────────────────────────────────────────────────────*/
-document.querySelector('.btn-submit')?.addEventListener('click', async ()=>{
-  const msg = `Submit attendance for <?= $dayLabel ?> (<?= date('d.m.Y', strtotime($date)) ?>)?`;
-  if (!confirm(msg)) return;
-
-  const out = { attendance: [] };
-
-  <?php foreach ($schedule as $s): foreach ($students as $u): ?>
-    (() => {
-      const el = document.getElementById('att_<?= $s['id'] ?>_<?= $u['id'] ?>');
-      if (!el || el.disabled) return;
-      const pres = !!el.checked;
-      const mot  = !pres && !!document.getElementById('mot_<?= $s['id'] ?>_<?= $u['id'] ?>').checked;
-      const rea  = mot ? (document.getElementById('mot_text_<?= $s['id'] ?>_<?= $u['id'] ?>').value || '') : '';
-      out.attendance.push({
-        schedule_id: <?= (int)$s['id'] ?>,
-        user_id:     <?= (int)$u['id'] ?>,
-        present:     pres,
-        motivated:   mot,
-        motivation:  rea
-      });
-    })();
-  <?php endforeach; endforeach; ?>
-
-  const url = `${location.origin}${location.pathname}${location.search}`;
-
-  try {
-    const resp = await fetch(url, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(out)
-    });
-
-    if (!resp.ok) throw new Error('HTTP '+resp.status);
-
-    // Some servers echo headers/footer — be liberal parsing JSON
-    const text = await resp.text();
-    const m = text.match(/\{[\s\S]*\}$/);
-    if (!m) throw new Error('Bad JSON');
-    const j = JSON.parse(m[0]);
-
-    if (!j.success) {
-      alert('Save failed: ' + (j.error || 'unknown'));
-      return;
-    }
-
-    // 1) Show success ribbon
-    document.getElementById('save-confirm').style.display='block';
-
-
-    // 2) Turn "Submit" into "Edit Attendance" (no refresh) — REPLACE NODE to drop old listeners
-const oldBtn = document.querySelector('.btn-submit');
-if (oldBtn) {
-  const newBtn = document.createElement('button');
-  newBtn.className = 'btn-edit';
-  newBtn.type = 'button';
-  newBtn.textContent = 'Edit Attendance';
-  newBtn.addEventListener('click', () => {
-    location.href = 'edit_attendance.php?tg_id=<?= $tg_id ?>&offset=<?= $offset ?>';
-  });
-  oldBtn.replaceWith(newBtn); // removes the old confirm listener
-}
-
-
-    // 3) Freeze cells and add "By <name>" with optional Reason (client-side)
-    out.attendance.forEach(r => {
-      const att = document.getElementById(`att_${r.schedule_id}_${r.user_id}`);
-      if (!att) return;
-
-      // lock switch
-      att.checked  = !!r.present;
-      att.disabled = true;
-
-      // remove editable motivation UI and replace with read-only line
-      const cont = document.getElementById(`mot_cont_${r.schedule_id}_${r.user_id}`);
-      if (cont) {
-        const td = cont.parentElement;
-        cont.remove();
-
-        const div = document.createElement('div');
-        div.className = 'mot-reason';
-
-        let html = '';
-        if (!r.present && r.motivated && r.motivation) {
-          html += 'Reason: ' + escapeHtml(r.motivation) + '<br>';
-        }
-        // we know who just marked; use server-echoed name if provided
-        const byName = escapeHtml(j.marked_by_name || CURRENT_USER_NAME);
-        html += `<em>By ${byName}</em>`;
-        div.innerHTML = html;
-
-        td.appendChild(div);
-      }
-    });
-
-    // 4) Safety: disable any remaining inputs
-    document.querySelectorAll('.att-toggle,.mot-toggle,.motiv-text')
-      .forEach(el => el.disabled = true);
-
-  } catch(err) {
-    console.error(err);
-    alert('Network error: ' + err.message);
-  }
-});
-</script>
 </body>
 </html>

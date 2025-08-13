@@ -108,22 +108,16 @@ if ($gQ->execute([$group_id]) && ($n = $gQ->fetchColumn())) {
 <!DOCTYPE html>
 <html lang="en" class="<?= $theme === 'dark' ? 'dark-theme' : '' ?>">
 <head>
+  <!-- Early theme & shared behaviors (no inline JS needed) -->
+  <script src="script.js"></script>
+
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Group Attendance</title>
   <link rel="stylesheet" href="style.css">
-  <script>
-    // COPIED FROM export.php — reveal switch & respect saved theme before paint
-    try {
-      const h = document.documentElement;
-      h.classList.add('js-ready');
-      if (localStorage.getItem('theme') === 'dark') h.classList.add('dark-theme');
-    } catch {}
-  </script>
 </head>
 <body>
 
-  <!-- COPIED FROM export.php -->
   <div id="theme-switch">
     <label class="switch">
       <input type="checkbox" id="theme-toggle">
@@ -134,7 +128,7 @@ if ($gQ->execute([$group_id]) && ($n = $gQ->fetchColumn())) {
 
   <!-- Back to greeting/group -->
   <button class="btn-nav"
-          onclick="location.href='greeting.php?tg_id=<?= $tg_id ?>&group_id=<?= $group_id ?>'">
+          onclick="location.href='greeting.php?tg_id=<?= (int)$tg_id ?>&group_id=<?= (int)$group_id ?>'">
     ← Back
   </button>
 
@@ -189,25 +183,5 @@ if ($gQ->execute([$group_id]) && ($n = $gQ->fetchColumn())) {
       <?php endforeach; ?>
     </tbody>
   </table>
-
-  <script>
-    // COPIED FROM export.php — init + toggle
-    const root   = document.documentElement;
-    const toggle = document.getElementById('theme-toggle');
-    const label  = document.getElementById('theme-label');
-    (() => {
-      const theme = localStorage.getItem('theme')||'light';
-      toggle.checked = theme==='dark';
-      root.classList.toggle('dark-theme', theme==='dark');
-      label.textContent = theme==='dark'?'Dark':'Light';
-    })();
-    toggle.addEventListener('change', () => {
-      const d = toggle.checked;
-      root.classList.toggle('dark-theme', d);
-      label.textContent = d?'Dark':'Light';
-      localStorage.setItem('theme', d?'dark':'light');
-    });
-  </script>
-
 </body>
 </html>

@@ -25,19 +25,15 @@ $action   = $_GET['action']   ?? '';
 // — 2) Helper: render a styled HTML menu —
 function render_page(string $title, array $links, int $tg_id, int $group_id) {
     ?><!DOCTYPE html>
-    <html lang="en"><head>
+    <html lang="en">
+    <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <title><?= htmlspecialchars($title) ?></title>
+
+      <!-- Early theme + shared behaviors (no inline JS needed) -->
+      <script src="script.js"></script>
       <link rel="stylesheet" href="style.css">
-      <script>
-        // Bootstrap CSS behaviors: show theme switch; respect saved theme
-        try {
-          const h = document.documentElement;
-          h.classList.add('js-ready');
-          if (localStorage.getItem('theme') === 'dark') h.classList.add('dark-theme');
-        } catch {}
-      </script>
     </head>
     <body>
       <div id="theme-switch">
@@ -51,7 +47,7 @@ function render_page(string $title, array $links, int $tg_id, int $group_id) {
       <br><br>
 
       <button class="btn btn-ghost btn-nav"
-        onclick="location.href='greeting.php?tg_id=<?= $tg_id ?>'">
+        onclick="location.href='greeting.php?tg_id=<?= (int)$tg_id ?>'">
         ← Back to Schedule
       </button>
 
@@ -64,24 +60,6 @@ function render_page(string $title, array $links, int $tg_id, int $group_id) {
           </a>
         <?php endforeach ?>
       </div>
-
-      <script>
-        const root   = document.documentElement;
-        const toggle = document.getElementById('theme-toggle');
-        const label  = document.getElementById('theme-label');
-        (() => {
-          const theme = localStorage.getItem('theme')||'light';
-          toggle.checked = theme==='dark';
-          root.classList.toggle('dark-theme', theme==='dark');
-          label.textContent = theme==='dark'?'Dark':'Light';
-        })();
-        toggle.addEventListener('change', () => {
-          const d = toggle.checked;
-          root.classList.toggle('dark-theme', d);
-          label.textContent = d?'Dark':'Light';
-          localStorage.setItem('theme', d?'dark':'light');
-        });
-      </script>
     </body>
     </html><?php
     exit;
