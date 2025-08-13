@@ -212,120 +212,13 @@ if (!empty($schedule)) {
     }
   } catch(e){}
 </script>
- <style>
-  /* copy your index.html styles… */
-  :root {
-    --bg:#fff; --fg:#000; --bd:#ccc;
-    --sec:#f5f5f5; --btn:#2a9df4; --btnfg:#fff;
-  }
-  .dark-theme {
-    --bg:#2b2d2f; --fg:#e2e2e4; --bd:#444;
-    --sec:#3b3f42; --btn:#1a73e8; --btnfg:#fff;
-  }
+ 
 
-  body {
-    margin:0; padding:10px;
-    font-family:sans-serif;
-    background:var(--bg);
-    color:var(--fg);
-  }
-  table {
-    width:100%;
-    border-collapse:collapse;
-    margin-top:10px;
-  }
-  th, td {
-    border:1px solid var(--bd);
-    padding:8px;
-    text-align:center;
-  }
-  th { background:var(--sec); }
 
-  .btn-submit {
-    margin-top:15px;
-    padding:10px 20px;
-    border:none;
-    border-radius:5px;
-    background:var(--btn);
-    color:var(--btnfg);
-    cursor:pointer;
-  }
-
-  .switch {
-    position:relative;
-    display:inline-block;
-    width:50px;
-    height:24px;
-  }
-  .switch input {
-    opacity:0; width:0; height:0;
-  }
-  .slider {
-    position:absolute;
-    top:0; left:0; right:0; bottom:0;
-    background:#ef5350;
-    border-radius:24px;
-    transition:.4s;
-  }
-  .slider:before {
-    content:"";
-    position:absolute;
-    width:18px; height:18px;
-    left:3px; bottom:3px;
-    background:#fff;
-    border-radius:50%;
-    transition:.4s;
-  }
-  input:checked + .slider {
-    background:#66bb6a;
-  }
-  input:checked + .slider:before {
-    transform:translateX(26px);
-  }
-
-  /* ─── Center Motivated under the switch ──────────────────────────── */
-  .mot-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    margin-top: 4px;
-  }
-  .motiv-text {
-    width:80px;
-    /* hidden by default, shown via JS */
-    display: none;
-  }
-  .edit-info {
-    font-size:0.8em;
-    color:var(--fg);
-    margin-top:4px;
-  }
-
-  .btn-nav {
-    margin-top:15px;
-    margin-right:8px;
-    padding:10px 20px;
-    border:none;
-    border-radius:5px;
-    background:var(--sec);
-    color:var(--fg);
-    cursor:pointer;
-  }
-  #theme-switch { visibility: hidden; }
-  html.js-ready #theme-switch { visibility: visible; }
-
-  /* ─── Grey out Present slider when disabled ──────────────────────── */
-  .att-toggle:disabled + .slider {
-    background-color: #ccc !important;
-    cursor: not-allowed;
-  }
-  .att-toggle:disabled + .slider:before {
-    background-color: #eee !important;
-  }
-</style>
-
+<link rel="stylesheet" href="style.css?v=20250812-144425">
 </head>
 <body>
+<br>
   <div id="theme-switch">
     <label class="switch">
       <input type="checkbox" id="theme-toggle">
@@ -333,15 +226,14 @@ if (!empty($schedule)) {
     </label>
     <span id="theme-label">Light</span>
   </div>
-
+<br><br>
   <!-- Your Back button / nav -->
   <div class="page-header">
     <button class="btn-nav" onclick="history.back()">← Back</button>
-    <!-- etc… -->
   </div>
+<br>
 
-
-<h2>Group: <?= htmlspecialchars($groupName,ENT_QUOTES) ?></h2>
+<h2>Group: <?= htmlspecialchars($groupName,ENT_QUOTES) ?></h2><br>
 <h2>Edit attendance for <?= htmlspecialchars($dayLabel) ?> (<?= date('d.m.Y',strtotime($date)) ?>)</h2>
   
   <?php if(empty($schedule)): ?>

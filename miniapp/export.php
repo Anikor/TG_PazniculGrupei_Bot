@@ -29,58 +29,15 @@ function render_page(string $title, array $links, int $tg_id, int $group_id) {
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <title><?= htmlspecialchars($title) ?></title>
+      <link rel="stylesheet" href="style.css">
       <script>
+        // Bootstrap CSS behaviors: show theme switch; respect saved theme
         try {
           const h = document.documentElement;
           h.classList.add('js-ready');
           if (localStorage.getItem('theme') === 'dark') h.classList.add('dark-theme');
         } catch {}
       </script>
-      <style>
-        :root {
-          --bg:#fff; --fg:#000; --bd:#ccc;
-          --sec:#f5f5f5; --btn:#2a9df4; --btnfg:#fff;
-        }
-        .dark-theme {
-          --bg:#2b2d2f; --fg:#e2e2e4; --bd:#444;
-          --sec:#3b3f42; --btn:#1a73e8; --btnfg:#fff;
-        }
-        html.js-ready #theme-switch { visibility: visible }
-        #theme-switch { visibility: hidden; display:inline-block; margin-right:1em; }
-        body {
-          margin:0; padding:10px;
-          font-family:sans-serif;
-          background:var(--bg);
-          color:var(--fg);
-        }
-        .btn-nav {
-          margin:4px 0; padding:6px 12px;
-          border:none; border-radius:4px;
-          background:var(--sec); color:var(--fg);
-          cursor:pointer;
-        }
-        .switch { position:relative; display:inline-block; width:50px; height:24px; }
-        .switch input { opacity:0; width:0; height:0; }
-        .slider {
-          position:absolute; top:0; left:0; right:0; bottom:0;
-          background:#ef5350; border-radius:24px; transition:.4s;
-        }
-        .slider:before {
-          content:""; position:absolute;
-          width:18px; height:18px;
-          left:3px; bottom:3px;
-          background:#fff; border-radius:50%; transition:.4s;
-        }
-        input:checked + .slider { background:#66bb6a; }
-        input:checked + .slider:before { transform:translateX(26px); }
-        .actions a {
-          display:inline-block; margin:0 .5em .5em 0;
-          padding:.6em 1.2em;
-          background:var(--btn); color:var(--btnfg);
-          text-decoration:none; border-radius:4px;
-        }
-        .actions a:hover { opacity:0.85; }
-      </style>
     </head>
     <body>
       <div id="theme-switch">
@@ -90,19 +47,24 @@ function render_page(string $title, array $links, int $tg_id, int $group_id) {
         </label>
         <span id="theme-label">Light</span>
       </div>
+
       <br><br>
-      <button class="btn-nav"
+
+      <button class="btn btn-ghost btn-nav"
         onclick="location.href='greeting.php?tg_id=<?= $tg_id ?>'">
         ← Back to Schedule
       </button>
+
       <h2><?= htmlspecialchars($title) ?></h2>
+
       <div class="actions">
         <?php foreach ($links as $link): ?>
-          <a href="<?= htmlspecialchars($link['url']) ?>">
+          <a class="btn btn-primary" href="<?= htmlspecialchars($link['url']) ?>">
             <?= htmlspecialchars($link['label']) ?>
           </a>
         <?php endforeach ?>
       </div>
+
       <script>
         const root   = document.documentElement;
         const toggle = document.getElementById('theme-toggle');
@@ -288,4 +250,3 @@ foreach ($data as $subj => $tbl) {
 
 fclose($out);
 exit;
-?>

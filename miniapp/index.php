@@ -168,6 +168,7 @@ $groupName = $grp['name'] ?? ('Group ' . $user['group_id']);
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <link rel=\"stylesheet\" href=\"style.css\">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Log Attendance</title>
@@ -182,74 +183,12 @@ try {
 } catch (e) {}
 </script>
 
-<style>
-  /* ───────────────── THEME ───────────────── */
-  :root {
-    --bg:#fff; --fg:#000; --bd:#ccc;
-    --sec:#f5f5f5; --btn:#2a9df4; --btnfg:#fff;
-  }
-  .dark-theme {
-    --bg:#2b2d2f; --fg:#e2e2e4; --bd:#444;
-    --sec:#3b3f42; --btn:#1a73e8; --btnfg:#fff;
-  }
-  #theme-switch { visibility: hidden; }
-  html.js-ready #theme-switch { visibility: visible; }
 
-  /* ───────────────── LAYOUT ───────────────── */
-  body { margin:0; padding:10px; font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--fg); }
-  h2 { margin:10px 0 4px; }
-  table { width:100%; border-collapse:collapse; margin-top:10px; }
-  th, td { border:1px solid var(--bd); padding:8px; text-align:center; vertical-align:middle; }
-  th { background:var(--sec); }
 
-  .btn-submit, .btn-edit {
-    margin-top:15px; padding:10px 20px;
-    border:none; border-radius:5px;
-    background:var(--btn); color:var(--btnfg);
-    cursor:pointer;
-  }
-  .btn-submit[disabled] { opacity:.8; cursor:not-allowed; }
-
-  .btn-nav {
-    margin:4px 6px 4px 0; padding:6px 12px;
-    border:none; border-radius:4px;
-    background:var(--sec); color:var(--fg); cursor:pointer;
-  }
-
-  /* ───────────────── SLIDER ───────────────── */
-  .switch { position:relative; display:inline-block; width:50px; height:24px; }
-  .switch input { opacity:0; width:0; height:0; }
-  .slider {
-    position:absolute; inset:0;
-    background:#ef5350; border-radius:24px; transition:.25s;
-  }
-  .slider:before {
-    content:""; position:absolute; width:18px; height:18px; left:3px; bottom:3px;
-    background:#fff; border-radius:50%; transition:.25s;
-  }
-  input:checked + .slider { background:#66bb6a; }
-  input:checked + .slider:before { transform:translateX(26px); }
-
-  /* Disabled-but-colored */
-  input:disabled:not(:checked) + .slider { background:#e57373; }
-  input:checked:disabled + .slider        { background:#a5d6a7; }
-
-  /* Motivation area */
-  .mot-reason { font-size:0.85em; color:var(--fg); margin-top:4px; }
-  .mot-edited { margin-top:2px; font-size:0.8em; opacity:0.85; }
-  .mot-container { text-align:center; margin-top:4px; }
-  .motiv-text { display:block; margin:4px auto 0; }
-
-  /* Save confirmation */
-  #save-confirm {
-    display:none; margin-top:15px; padding:10px;
-    background:#d4edda; color:#155724;
-    border:1px solid #c3e6cb; border-radius:4px;
-  }
-</style>
+<link rel="stylesheet" href="style.css?v=20250812-144425">
 </head>
 <body>
-
+<br>
 <!-- Theme toggle -->
 <div id="theme-switch">
   <label class="switch">
@@ -258,7 +197,7 @@ try {
   </label>
   <span id="theme-label">Light</span>
 </div>
-<br>
+<br><br>
 
 <!-- Navigation -->
 <div style="margin-top:6px;">
