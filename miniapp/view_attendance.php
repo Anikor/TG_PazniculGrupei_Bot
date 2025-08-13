@@ -20,7 +20,6 @@ if (
            . '&group_id=' . intval($_GET['group_id']);
 }
 
-
 // 2) Build date ranges
 $today      = date('Y-m-d');
 $weekStart  = date('Y-m-d', strtotime('monday this week'));
@@ -95,7 +94,6 @@ $stats = [
 
 // 5) Compute estimated lab fee (50 Lei per missed lab) for “All Time”
 $all = $stats['All Time'];
-// Count only lab absences in that set
 $labMissQ = $pdo->prepare("
   SELECT COUNT(*) FROM attendance a
   JOIN schedule s ON s.id=a.schedule_id
@@ -105,7 +103,7 @@ $labMissQ->execute([':uid'=>$user_id]);
 $labMissCount = (int)$labMissQ->fetchColumn();
 $labFee = $labMissCount * 50;
 
-// 6) Build per‐subject breakdown
+// 6) Build per-subject breakdown
 $subjRows = $pdo->prepare("
   SELECT s.subject, s.type,
          COUNT(*) AS total,
@@ -124,7 +122,6 @@ while($r = $subjRows->fetch(PDO::FETCH_ASSOC)){
     'total'=>$r['total'],
     'absent'=>$r['absent'],
   ];
-  // accumulate overall
   if (!isset($subjStats[$sub]['overall'])) {
     $subjStats[$sub]['overall'] = ['total'=>0,'absent'=>0];
   }
@@ -132,46 +129,38 @@ while($r = $subjRows->fetch(PDO::FETCH_ASSOC)){
   $subjStats[$sub]['overall']['absent'] += $r['absent'];
 }
 
-// 7) Theme cookie
+// 7) Theme cookie (initial HTML class)
 $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
-
 ?>
 <!DOCTYPE html>
 <html lang="en" class="<?= $theme==='dark'?'dark-theme':'' ?>">
 <head>
-    <link rel="stylesheet" href="style.css">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>My Attendance</title>
-  
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<br>
+  <br>
+
   <!-- Theme toggle -->
   <div id="theme-switch">
     <label class="switch">
-      <input type="checkbox" id="theme-toggle"
-             <?= $theme==='dark'?'checked':''?>>
+      <input type="checkbox" id="theme-toggle" <?= $theme==='dark'?'checked':''?>>
       <span class="slider"></span>
     </label>
-    <span id="theme-label">
-      <?= $theme==='dark' ? 'Dark' : 'Light' ?>
-    </span>
+    <span id="theme-label"><?= $theme==='dark' ? 'Dark' : 'Light' ?></span>
   </div>
-<br><br>
-<button class="btn-nav"
-        onclick="location.href='<?= $backUrl ?>'">
-  ← Back
-</button>
+
+  <br><br>
+  <button class="btn-nav" onclick="location.href='<?= $backUrl ?>'">← Back</button>
 
   <h1>My Attendance</h1>
 
-  <!-- Summary cards + lab‐fee -->
+  <!-- Summary cards + lab-fee -->
   <div class="cards">
     <?php foreach($stats as $label=>$st):
-      $rate = $st['total']
-            ? round(100*$st['absent']/$st['total'],1)
-            : 0;
+      $rate = $st['total'] ? round(100*$st['absent']/$st['total'],1) : 0;
     ?>
     <div class="card">
       <h3><?= $label ?></h3>
@@ -189,9 +178,8 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
     <?php endforeach; ?>
   </div>
 
-
   <!-- By-Subject breakdown -->
- <h2>By Subject Absence Rates</h2>
+  <h2>By Subject Absence Rates</h2>
   <table class="subj-table">
     <thead>
       <tr>
@@ -204,7 +192,6 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
     </thead>
     <tbody>
       <?php foreach($subjStats as $sub=>$data):
-        // overall totals & rate
         $oTotal = $data['overall']['total'];
         $oAbsent= $data['overall']['absent'];
         $oRate  = $oTotal ? 100 * $oAbsent / $oTotal : 0;
@@ -229,7 +216,6 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
       <?php endforeach; ?>
     </tbody>
   </table>
-
 
   <!-- Absence details per period -->
   <?php foreach($stats as $label=>$st):
@@ -260,29 +246,7 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
     </table>
   <?php endforeach; ?>
 
-  
-
-<script>
-document.documentElement.classList.add("js-ready");
-
-const toggle = document.getElementById('theme-toggle');
-  const label  = document.getElementById('theme-label');
-  const root   = document.documentElement;
-
-  // initialize from localStorage
-  (saved => {
-    root.classList.toggle('dark-theme', saved === 'dark');
-    label.textContent = saved === 'dark' ? 'Dark' : 'Light';
-    toggle.checked = saved === 'dark';
-  })(localStorage.getItem('theme') || 'light');
-
-  // persist on change
-  toggle.addEventListener('change', () => {
-    const isDark = toggle.checked;
-    root.classList.toggle('dark-theme', isDark);
-    label.textContent = isDark ? 'Dark' : 'Light';
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  });
-</script>
+  <!-- Load shared JS (theme toggle + optional period slider) -->
+  <script src="script.js"></script>
 </body>
 </html>

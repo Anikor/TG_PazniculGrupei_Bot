@@ -12,24 +12,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if (!isset($_SESSION['tg_id'])) {
+  // Minimal bootstrap page: Telegram script + our shared script.js.
   ?>
-  <!DOCTYPE html><html lang="en"><head>
-    <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Loading…</title>
-  </head><body>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script>
-    const tg = window.Telegram?.WebApp; try { tg?.expand(); } catch(e){}
-    const user = tg?.initDataUnsafe?.user;
-    if (!user) {
-      document.body.innerHTML = '<p style="color:red">Cannot detect user ID</p>';
-    } else {
-      fetch(location.href, {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ tg_id: user.id })
-      }).then(()=>{ history.replaceState(null,'',location.pathname+location.search); location.reload(); });
-    }
-  </script></body></html>
+    <!-- Early theme and bootstrap logic live in script.js -->
+    <script src="script.js"></script>
+  </head>
+  <body>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <div id="tg-bootstrap"></div>
+  </body>
+  </html>
   <?php
   exit;
 }
@@ -137,21 +135,13 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- match index/export: load style.css and apply theme before paint -->
+  <!-- Early theme & shared behaviors -->
+  <script src="script.js"></script>
+
   <link rel="stylesheet" href="style.css">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Greeting</title>
-
-  <script>
-  try {
-    const html = document.documentElement;
-    html.classList.add('js-ready');
-    if (localStorage.getItem('theme') === 'dark') {
-      html.classList.add('dark-theme');
-    }
-  } catch (e) {}
-  </script>
 
   <!-- Page CSS -->
   <link rel="stylesheet" href="<?= htmlspecialchars($cssSmallUrl, ENT_QUOTES) ?>" id="css-small" media="all">
@@ -170,13 +160,13 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
     </label>
     <span id="theme-label">Light</span>
 
-      <!-- Big/Compact toggle — ONLY on week view -->
-  <?php if ($when === 'week'): ?>
-  <label class="switch" style="margin-left:.75rem">
-    <input type="checkbox" id="table-toggle"><span class="slider"></span>
-  </label>
-  <span id="table-label"><?= ($tableLayout==='big') ? 'Big' : 'Compact' ?></span>
-  <?php endif; ?>
+    <!-- Big/Compact toggle — ONLY on week view -->
+    <?php if ($when === 'week'): ?>
+      <label class="switch" style="margin-left:.75rem">
+        <input type="checkbox" id="table-toggle"><span class="slider"></span>
+      </label>
+      <span id="table-label"><?= ($tableLayout==='big') ? 'Big' : 'Compact' ?></span>
+    <?php endif; ?>
   </div>
 
   <br><br><h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
@@ -353,61 +343,5 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
       <?php endif; ?>
     <?php endif; ?>
   </div>
-
-  <!-- THEME: same code as index/export -->
-  <script>
-  /* ───────────────── Theme toggle (identical to index/export) ───────────────── */
-  const toggle = document.getElementById('theme-toggle');
-  const label  = document.getElementById('theme-label');
-  const root   = document.documentElement;
-
-  // initialize from localStorage
-  (() => {
-    const saved = localStorage.getItem('theme') || 'light';
-    root.classList.toggle('dark-theme', saved === 'dark');
-    label.textContent = saved === 'dark' ? 'Dark' : 'Light';
-    toggle.checked = (saved === 'dark');
-  })();
-
-  toggle.addEventListener('change', () => {
-    const isDark = toggle.checked;
-    root.classList.toggle('dark-theme', isDark);
-    label.textContent = isDark ? 'Dark' : 'Light';
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  });
-  </script>
-
-  <!-- Week layout toggle -->
-  <script>
-    const tableToggle = document.getElementById('table-toggle');
-    const tableLabel  = document.getElementById('table-label');
-    const cssBig      = document.getElementById('css-big');
-
-    if (tableToggle && cssBig) {
-      const ANIM_MS = 260;
-      function applyLayout(mode){
-        cssBig.media = (mode === 'big') ? 'all' : 'not all';
-        localStorage.setItem('tableLayout', mode);
-        document.cookie = 'tableLayout=' + encodeURIComponent(mode) + ';path=/;max-age=' + (60*60*24*365);
-      }
-      function setUI(mode){
-        tableToggle.checked = (mode === 'big');
-        if (tableLabel) tableLabel.textContent = (mode === 'big') ? 'Big' : 'Compact';
-      }
-
-      const stored  = localStorage.getItem('tableLayout');
-      const initial = (stored === 'big' || stored === 'small') ? stored : <?= json_encode($tableLayout) ?>;
-      setUI(initial); // cssBig.media is already set by PHP for first paint
-
-      tableToggle.addEventListener('change', e => {
-        const mode = e.target.checked ? 'big' : 'small';
-        setUI(mode);
-        setTimeout(() => { applyLayout(mode); }, ANIM_MS);
-      });
-    }
-
-    try { window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.expand(); } catch(e){}
-  </script>
-
 </body>
 </html>
