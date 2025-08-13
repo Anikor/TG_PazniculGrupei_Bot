@@ -67,7 +67,6 @@ foreach ($students as $stu) {
     $stats[$sid][$lbl] = [
       'total'  => $tot,
       'absent' => $abs,
-      // percent present
       'rate'   => $tot ? round(100 * ($tot - $abs) / $tot, 2) : 0,
     ];
   }
@@ -113,17 +112,25 @@ if ($gQ->execute([$group_id]) && ($n = $gQ->fetchColumn())) {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Group Attendance</title>
   <link rel="stylesheet" href="style.css">
+  <script>
+    // COPIED FROM export.php — reveal switch & respect saved theme before paint
+    try {
+      const h = document.documentElement;
+      h.classList.add('js-ready');
+      if (localStorage.getItem('theme') === 'dark') h.classList.add('dark-theme');
+    } catch {}
+  </script>
 </head>
 <body>
 
-  <!-- Theme switch -->
+  <!-- COPIED FROM export.php -->
   <div id="theme-switch">
     <label class="switch">
-      <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
+      <input type="checkbox" id="theme-toggle">
       <span class="slider"></span>
     </label>
-    <span id="theme-label"><?= $theme === 'dark' ? 'Dark' : 'Light' ?></span>
-  </div>
+    <span id="theme-label">Light</span>
+  </div><br><br>
 
   <!-- Back to greeting/group -->
   <button class="btn-nav"
@@ -184,22 +191,21 @@ if ($gQ->execute([$group_id]) && ($n = $gQ->fetchColumn())) {
   </table>
 
   <script>
-    // Theme toggle via localStorage + .dark-theme on <html>
+    // COPIED FROM export.php — init + toggle
+    const root   = document.documentElement;
     const toggle = document.getElementById('theme-toggle');
     const label  = document.getElementById('theme-label');
-
-    (function(saved){
-      const isDark = (saved === 'dark');
-      document.documentElement.classList.toggle('dark-theme', isDark);
-      label.textContent = isDark ? 'Dark' : 'Light';
-      if (toggle) toggle.checked = isDark;
-    })(localStorage.getItem('theme') || 'light');
-
+    (() => {
+      const theme = localStorage.getItem('theme')||'light';
+      toggle.checked = theme==='dark';
+      root.classList.toggle('dark-theme', theme==='dark');
+      label.textContent = theme==='dark'?'Dark':'Light';
+    })();
     toggle.addEventListener('change', () => {
-      const isDark = toggle.checked;
-      document.documentElement.classList.toggle('dark-theme', isDark);
-      label.textContent = isDark ? 'Dark' : 'Light';
-      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      const d = toggle.checked;
+      root.classList.toggle('dark-theme', d);
+      label.textContent = d?'Dark':'Light';
+      localStorage.setItem('theme', d?'dark':'light');
     });
   </script>
 

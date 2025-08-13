@@ -15,7 +15,8 @@ if (!isset($_SESSION['tg_id'])) {
   ?>
   <!DOCTYPE html><html lang="en"><head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Loading…</title></head><body>
+    <title>Loading…</title>
+  </head><body>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script>
     const tg = window.Telegram?.WebApp; try { tg?.expand(); } catch(e){}
@@ -61,10 +62,7 @@ $tg_id = $session_tg_id;               // default: act as self
 if ($user['role'] === 'admin' && isset($_GET['tg_id']) && ctype_digit((string)$_GET['tg_id'])) {
   $as_tg_id = (int)$_GET['tg_id'];
   $as_user  = getUserByTgId($as_tg_id);
-  if ($as_user) {                      // only switch if target exists
-    $tg_id = $as_tg_id;
-    $user  = $as_user;
-  }
+  if ($as_user) { $tg_id = $as_tg_id; $user = $as_user; }
 }
 $impersonating = ($tg_id !== $session_tg_id);
 
@@ -73,8 +71,7 @@ $weekType = getCurrentWeekType();      // 'odd' | 'even'
 $subgroup = $user['subgroup'] ?? null;
 
 /* Admin override group via GET (optional; useful while previewing) */
-if (($session_tg_id === $_SESSION['tg_id']) &&                       // sanity
-    isset($user['role']) && $user['role'] === 'admin' && isset($_GET['group_id'])) {
+if (($session_tg_id === $_SESSION['tg_id']) && isset($user['role']) && $user['role'] === 'admin' && isset($_GET['group_id'])) {
   $g = (int)$_GET['group_id']; if ($g > 0) $user['group_id'] = $g;
 }
 
@@ -130,43 +127,59 @@ $tableLayout = $_COOKIE['tableLayout'] ?? 'small'; // 'small' | 'big'
 $baseUri     = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');  // e.g. /TG_Bot/miniapp
 $bigPath     = __DIR__ . '/tableb.css';
 $smallPath   = __DIR__ . '/tablec.css';
-$cssBigUrl   = $baseUri . '/tableb.css?v='   . (file_exists($bigPath)   ? filemtime($bigPath)   : time());
-$cssSmallUrl = $baseUri . '/tablec.css?v='   . (file_exists($smallPath) ? filemtime($smallPath) : time());
+$stylePath   = __DIR__ . '/style.css';
+$cssStyleUrl = $baseUri . '/style.css?v='   . (file_exists($stylePath) ? filemtime($stylePath) : time());
+$cssBigUrl   = $baseUri . '/tableb.css?v='  . (file_exists($bigPath)   ? filemtime($bigPath)   : time());
+$cssSmallUrl = $baseUri . '/tablec.css?v='  . (file_exists($smallPath) ? filemtime($smallPath) : time());
 
-/* Carry impersonation through navigation if admin is viewing-as */
 $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<!-- Base styles ALWAYS (daily + shared) -->
-<link rel="stylesheet" href="<?= htmlspecialchars($cssSmallUrl, ENT_QUOTES) ?>" id="css-small" media="all">
-<!-- Week-grid overrides ONLY on week view -->
-<?php if ($when === 'week'): ?>
-<link rel="stylesheet" href="<?= htmlspecialchars($cssBigUrl, ENT_QUOTES) ?>" id="css-big"
-      media="<?= ($tableLayout==='big') ? 'all' : 'not all' ?>">
-<?php endif; ?>
+  <!-- match index/export: load style.css and apply theme before paint -->
+  <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Greeting</title>
 
+  <script>
+  try {
+    const html = document.documentElement;
+    html.classList.add('js-ready');
+    if (localStorage.getItem('theme') === 'dark') {
+      html.classList.add('dark-theme');
+    }
+  } catch (e) {}
+  </script>
+
+  <!-- Page CSS -->
+  <link rel="stylesheet" href="<?= htmlspecialchars($cssSmallUrl, ENT_QUOTES) ?>" id="css-small" media="all">
+  <?php if ($when === 'week'): ?>
+  <link rel="stylesheet" href="<?= htmlspecialchars($cssBigUrl, ENT_QUOTES) ?>" id="css-big"
+        media="<?= ($tableLayout==='big') ? 'all' : 'not all' ?>">
+  <?php endif; ?>
 </head>
-<body class="<?= (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark-theme' : '' ?>">
+<body>
+  <br>
+  <!-- Theme toggle (identical markup to index/export) -->
+  <div id="theme-switch">
+    <label class="switch">
+      <input type="checkbox" id="theme-toggle">
+      <span class="slider"></span>
+    </label>
+    <span id="theme-label">Light</span>
 
-  <!-- Theme toggle -->
-  <label class="switch">
-    <input type="checkbox" id="theme-toggle"><span class="slider"></span>
-  </label>
-  <span id="theme-label">Light</span>
-
-  <!-- Big/Compact toggle — ONLY on week view -->
+      <!-- Big/Compact toggle — ONLY on week view -->
   <?php if ($when === 'week'): ?>
   <label class="switch" style="margin-left:.75rem">
     <input type="checkbox" id="table-toggle"><span class="slider"></span>
   </label>
   <span id="table-label"><?= ($tableLayout==='big') ? 'Big' : 'Compact' ?></span>
   <?php endif; ?>
+  </div>
 
-  <br><br><br><h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
+  <br><br><h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
   <?php if ($user['role'] !== 'student'): ?>
     <p>Role: <strong><?= ucfirst(htmlspecialchars($user['role'])) ?></strong></p>
   <?php endif; ?>
@@ -341,28 +354,37 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
     <?php endif; ?>
   </div>
 
+  <!-- THEME: same code as index/export -->
   <script>
-    // Theme toggle
-    const themeToggle = document.getElementById('theme-toggle');
-    const themeLabel  = document.getElementById('theme-label');
-    const body        = document.body;
-    let currentTheme  = localStorage.getItem('theme') || 'light';
-    if (currentTheme === 'dark') { body.classList.add('dark-theme'); themeToggle.checked = true; themeLabel.textContent = 'Dark'; }
-    themeToggle.addEventListener('change', e => {
-      if (e.target.checked) { body.classList.add('dark-theme'); localStorage.setItem('theme','dark'); document.cookie='theme=dark;path=/;max-age='+60*60*24*365; themeLabel.textContent='Dark'; }
-      else { body.classList.remove('dark-theme'); localStorage.setItem('theme','light'); document.cookie='theme=light;path=/;max-age='+60*60*24*365; themeLabel.textContent='Light'; }
-    });
+  /* ───────────────── Theme toggle (identical to index/export) ───────────────── */
+  const toggle = document.getElementById('theme-toggle');
+  const label  = document.getElementById('theme-label');
+  const root   = document.documentElement;
+
+  // initialize from localStorage
+  (() => {
+    const saved = localStorage.getItem('theme') || 'light';
+    root.classList.toggle('dark-theme', saved === 'dark');
+    label.textContent = saved === 'dark' ? 'Dark' : 'Light';
+    toggle.checked = (saved === 'dark');
+  })();
+
+  toggle.addEventListener('change', () => {
+    const isDark = toggle.checked;
+    root.classList.toggle('dark-theme', isDark);
+    label.textContent = isDark ? 'Dark' : 'Light';
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+  });
   </script>
 
+  <!-- Week layout toggle -->
   <script>
-    // Big/Compact toggle logic — only on week view
     const tableToggle = document.getElementById('table-toggle');
     const tableLabel  = document.getElementById('table-label');
     const cssBig      = document.getElementById('css-big');
 
     if (tableToggle && cssBig) {
-      const ANIM_MS = 260; // wait for the thumb transition
-
+      const ANIM_MS = 260;
       function applyLayout(mode){
         cssBig.media = (mode === 'big') ? 'all' : 'not all';
         localStorage.setItem('tableLayout', mode);
@@ -379,10 +401,8 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 
       tableToggle.addEventListener('change', e => {
         const mode = e.target.checked ? 'big' : 'small';
-        setUI(mode);                // animate switch first
-        setTimeout(() => {          // then swap CSS
-          applyLayout(mode);
-        }, ANIM_MS);
+        setUI(mode);
+        setTimeout(() => { applyLayout(mode); }, ANIM_MS);
       });
     }
 
