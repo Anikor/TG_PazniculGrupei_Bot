@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // miniapp/view_attendance.php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
@@ -19,7 +19,6 @@ if (
            . '?tg_id='    . intval($_GET['monitor_id'])
            . '&group_id=' . intval($_GET['group_id']);
 }
-
 
 // 2) Build date ranges
 $today      = date('Y-m-d');
@@ -95,7 +94,6 @@ $stats = [
 
 // 5) Compute estimated lab fee (50 Lei per missed lab) for “All Time”
 $all = $stats['All Time'];
-// Count only lab absences in that set
 $labMissQ = $pdo->prepare("
   SELECT COUNT(*) FROM attendance a
   JOIN schedule s ON s.id=a.schedule_id
@@ -105,7 +103,7 @@ $labMissQ->execute([':uid'=>$user_id]);
 $labMissCount = (int)$labMissQ->fetchColumn();
 $labFee = $labMissCount * 50;
 
-// 6) Build per‐subject breakdown
+// 6) Build per-subject breakdown
 $subjRows = $pdo->prepare("
   SELECT s.subject, s.type,
          COUNT(*) AS total,
@@ -124,7 +122,6 @@ while($r = $subjRows->fetch(PDO::FETCH_ASSOC)){
     'total'=>$r['total'],
     'absent'=>$r['absent'],
   ];
-  // accumulate overall
   if (!isset($subjStats[$sub]['overall'])) {
     $subjStats[$sub]['overall'] = ['total'=>0,'absent'=>0];
   }
@@ -132,9 +129,8 @@ while($r = $subjRows->fetch(PDO::FETCH_ASSOC)){
   $subjStats[$sub]['overall']['absent'] += $r['absent'];
 }
 
-// 7) Theme cookie
+// 7) Theme cookie (initial HTML class)
 $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
-
 ?>
 <!DOCTYPE html>
 <html lang="en" class="<?= $theme==='dark'?'dark-theme':'' ?>">
@@ -142,104 +138,29 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>My Attendance</title>
-  <style>
-    /* ─── THEME & RESET ───────────────────────────────── */
-    :root {
-      --bg:#fff; --fg:#000; --sec:#f5f5f5; --bd:#ccc;
-      --btnbg:#2a9df4; --btnfg:#fff;
-    }
-    .dark-theme {
-      --bg:#2b2d2f; --fg:#e2e2e4; --sec:#3b3f42; --bd:#444;
-      --btnbg:#1a73e8; --btnfg:#fff;
-    }
-    body {
-      margin:0; padding:10px;
-      background:var(--bg);
-      color:var(--fg);
-      font-family:sans-serif;
-    }
-
-    /* ─── THEME TOGGLE ──────────────────────────────── */
-    #theme-switch {
-      margin-bottom:15px;
-    }
-    .switch {position:relative;display:inline-block;width:50px;height:24px;}
-    .switch input{opacity:0;width:0;height:0;}
-    .slider{position:absolute;top:0;left:0;right:0;bottom:0;
-            background:#ef5350;border-radius:24px;transition:.4s;}
-    .slider:before{content:"";position:absolute;width:18px;height:18px;
-                   left:3px;bottom:3px;background:#fff;border-radius:50%;
-                   transition:.4s;}
-    input:checked+.slider{background:#66bb6a;}
-    input:checked+.slider:before{transform:translateX(26px);}
-
-    /* ─── NAV BUTTON ─────────────────────────────────── */
-    .btn-nav {
-      display:inline-block;
-      margin:10px 0 20px;
-      padding:6px 12px;
-      background:var(--sec);
-      border:none;
-      border-radius:4px;
-      color:var(--fg);
-      cursor:pointer;
-    }
-
-    /* ─── SUMMARY CARDS ─────────────────────────────── */
-    .cards { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px; }
-    .card {
-      flex:1; min-width:180px;
-      padding:12px;
-      background:var(--sec);
-      border:1px solid var(--bd);
-      border-radius:6px;
-    }
-    .card h3 { margin:0 0 8px; font-size:1em; }
-    .card p { margin:4px 0; font-size:.9em; }
-
-    /* ─── ABSENCES TABLE ───────────────────────────── */
-    table { width:100%; border-collapse:collapse; margin-top:20px; }
-    th,td {
-      border:1px solid var(--bd);
-      padding:6px; text-align:left;
-    }
-    th { background:var(--sec); }
-
-    /* ─── SUBJECT STATS ────────────────────────────── */
-    .subj-table { margin-top:30px; width:100%; border-collapse:collapse; }
-    .subj-table th,.subj-table td {
-      border:1px solid var(--bd); padding:6px; text-align:center;
-    }
-    .subj-table th { background:var(--sec); }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <br>
 
   <!-- Theme toggle -->
   <div id="theme-switch">
     <label class="switch">
-      <input type="checkbox" id="theme-toggle"
-             <?= $theme==='dark'?'checked':''?>>
+      <input type="checkbox" id="theme-toggle" <?= $theme==='dark'?'checked':''?>>
       <span class="slider"></span>
     </label>
-    <span id="theme-label">
-      <?= $theme==='dark' ? 'Dark' : 'Light' ?>
-    </span>
+    <span id="theme-label"><?= $theme==='dark' ? 'Dark' : 'Light' ?></span>
   </div>
 
-<button class="btn-nav"
-        onclick="location.href='<?= $backUrl ?>'">
-  ← Back
-</button>
+  <br><br>
+  <button class="btn-nav" onclick="location.href='<?= $backUrl ?>'">← Back</button>
 
   <h1>My Attendance</h1>
 
-  <!-- Summary cards + lab‐fee -->
+  <!-- Summary cards + lab-fee -->
   <div class="cards">
     <?php foreach($stats as $label=>$st):
-      $rate = $st['total']
-            ? round(100*$st['absent']/$st['total'],1)
-            : 0;
+      $rate = $st['total'] ? round(100*$st['absent']/$st['total'],1) : 0;
     ?>
     <div class="card">
       <h3><?= $label ?></h3>
@@ -257,9 +178,8 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
     <?php endforeach; ?>
   </div>
 
-
   <!-- By-Subject breakdown -->
- <h2>By Subject Absence Rates</h2>
+  <h2>By Subject Absence Rates</h2>
   <table class="subj-table">
     <thead>
       <tr>
@@ -272,7 +192,6 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
     </thead>
     <tbody>
       <?php foreach($subjStats as $sub=>$data):
-        // overall totals & rate
         $oTotal = $data['overall']['total'];
         $oAbsent= $data['overall']['absent'];
         $oRate  = $oTotal ? 100 * $oAbsent / $oTotal : 0;
@@ -297,7 +216,6 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
       <?php endforeach; ?>
     </tbody>
   </table>
-
 
   <!-- Absence details per period -->
   <?php foreach($stats as $label=>$st):
@@ -328,27 +246,7 @@ $theme = (($_COOKIE['theme'] ?? 'light')==='dark') ? 'dark' : 'light';
     </table>
   <?php endforeach; ?>
 
-  
-
-<script>
-const toggle = document.getElementById('theme-toggle');
-  const label  = document.getElementById('theme-label');
-  const root   = document.documentElement;
-
-  // initialize from localStorage
-  (saved => {
-    root.classList.toggle('dark-theme', saved === 'dark');
-    label.textContent = saved === 'dark' ? 'Dark' : 'Light';
-    toggle.checked = saved === 'dark';
-  })(localStorage.getItem('theme') || 'light');
-
-  // persist on change
-  toggle.addEventListener('change', () => {
-    const isDark = toggle.checked;
-    root.classList.toggle('dark-theme', isDark);
-    label.textContent = isDark ? 'Dark' : 'Light';
-    localStorage.setItem('theme', isDark ? 'dark' : 'light');
-  });
-</script>
+  <!-- Load shared JS (theme toggle + optional period slider) -->
+  <script src="script.js"></script>
 </body>
 </html>

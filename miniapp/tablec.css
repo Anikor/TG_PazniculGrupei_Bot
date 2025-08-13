@@ -1,5 +1,3 @@
-/* tablec.css — BASE (daily + shared) + switches */
-
 /* Keep tables as tables on narrow screens */
 table{display:table!important;width:100%!important;table-layout:auto!important}
 thead{display:table-header-group!important}
@@ -71,8 +69,7 @@ abbr.subject-short:hover,abbr.subject-short:focus{text-decoration:none;border-bo
 .subject-short{display:none}
 @media (max-width:610px){
   .subject-full{display:none}
-  .subject-short{display:inline}
-}
+  .subject-short{display:inline}}
 
 /* Small screens (≤610px): shorten weekday headers + compact cell padding */
 @media (max-width:610px){
@@ -84,10 +81,7 @@ abbr.subject-short:hover,abbr.subject-short:focus{text-decoration:none;border-bo
   .schedule-table thead th:nth-child(5)::after{content:"Thu."}
   .schedule-table thead th:nth-child(6)::after{content:"Fri."}
   .schedule-table thead th::after{font-size:15px}
-
   .schedule-table{font-size:15px}
   .schedule-table td{padding:4px;line-height:1.15}
   .schedule-table small{font-size:.8em}
-
-  .schedule-table col.col-time{width:52px}
-}
+  .schedule-table col.col-time{width:52px}}
