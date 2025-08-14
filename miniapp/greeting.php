@@ -11,16 +11,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   exit;
 }
 
+/* ── 0.1) Server-side theme pre-paint (eliminates flicker) ─────────────────── */
+$cookieTheme = $_COOKIE['theme'] ?? 'light';
+$theme       = ($cookieTheme === 'dark') ? 'dark' : 'light';
+$themeClass  = ($theme === 'dark') ? 'dark-theme' : '';
+
+/* If not bootstrapped yet, render minimal loader (but still prepaint theme) */
 if (!isset($_SESSION['tg_id'])) {
-  // Minimal bootstrap page: Telegram script + our shared script.js.
   ?>
   <!DOCTYPE html>
-  <html lang="en">
+  <html lang="en" class="<?= $themeClass ?>">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Loading…</title>
-    <!-- Early theme and bootstrap logic live in script.js -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Early bootstrap logic lives in script.js -->
     <script src="script.js"></script>
   </head>
   <body>
@@ -130,10 +136,11 @@ $cssStyleUrl = $baseUri . '/style.css?v='   . (file_exists($stylePath) ? filemti
 $cssBigUrl   = $baseUri . '/tableb.css?v='  . (file_exists($bigPath)   ? filemtime($bigPath)   : time());
 $cssSmallUrl = $baseUri . '/tablec.css?v='  . (file_exists($smallPath) ? filemtime($smallPath) : time());
 
+/* Preserve “view-as” param for nav buttons if impersonating */
 $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="<?= $themeClass ?>">
 <head>
   <!-- Early theme & shared behaviors -->
   <script src="script.js"></script>
@@ -152,13 +159,13 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 </head>
 <body>
   <br>
-  <!-- Theme toggle (identical markup to index/export) -->
+  <!-- Theme toggle: pre-checked + correct label from server-side theme -->
   <div id="theme-switch">
     <label class="switch">
-      <input type="checkbox" id="theme-toggle">
+      <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
       <span class="slider"></span>
     </label>
-    <span id="theme-label">Light</span>
+    <span id="theme-label"><?= $theme === 'dark' ? 'Dark' : 'Light' ?></span>
 
     <!-- Big/Compact toggle — ONLY on week view -->
     <?php if ($when === 'week'): ?>

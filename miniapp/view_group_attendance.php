@@ -95,8 +95,9 @@ foreach ($sum as $lbl => $vals) {
   ];
 }
 
-// 9) Theme class from cookie (CSS handles .dark-theme)
-$theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
+// 9) Theme class from cookie (CSS handles .dark-theme) — also set initial slider state/label
+$theme       = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
+$themeLabel  = ($theme === 'dark') ? 'Dark' : 'Light';
 
 // 10) Group name (optional, if you have groups table)
 $groupName = "Group {$group_id}";
@@ -120,10 +121,10 @@ if ($gQ->execute([$group_id]) && ($n = $gQ->fetchColumn())) {
 
   <div id="theme-switch">
     <label class="switch">
-      <input type="checkbox" id="theme-toggle">
+      <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
       <span class="slider"></span>
     </label>
-    <span id="theme-label">Light</span>
+    <span id="theme-label"><?= $themeLabel ?></span>
   </div><br><br>
 
   <!-- Back to greeting/group -->
