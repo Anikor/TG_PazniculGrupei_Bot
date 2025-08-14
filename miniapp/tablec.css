@@ -59,7 +59,7 @@ thead th{white-space:nowrap; word-break:normal; overflow-wrap:normal}
 .slider:before{content:"";position:absolute;left:3px;bottom:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .25s}
 .switch input:checked + .slider{background:#66bb6a}
 .switch input:checked + .slider:before{transform:translateX(26px)}
-#theme-label{margin-left:.5rem;vertical-align:middle}
+
 
 /* Remove dotted underline on initials */
 abbr.subject-short{text-decoration:none;border-bottom:0;cursor:default}
