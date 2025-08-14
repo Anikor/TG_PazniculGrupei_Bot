@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 <?php
 /**
  * Given a DateTime $date, determine:
@@ -66,3 +67,6 @@ function getCurrentWeekType(): string {
     [, , , $weekType] = computeSemesterAndWeek($today);
     return $weekType;
 }
+=======
+<?php function computeSemesterAndWeek(DateTime $date):array{$year=(int)$date->format('Y');$month=(int)$date->format('n');if($month>=9){$semester=1;$semesterYear=$year;$start=new DateTime("$semesterYear-09-01");}elseif($month<2){$semester=1;$semesterYear=$year-1;$start=new DateTime("$semesterYear-09-01");}else{$semester=2;$start=new DateTime("$year-02-01");}$dow=(int)$start->format('N');if($dow>=6){$start->modify('next monday');}$daysDiff=$date->diff($start)->days;$weekNumber=(int) floor($daysDiff/7)+1;$weekType=($weekNumber%2===1)?'odd':'even';return[$semester,$start,$weekNumber,$weekType];}$today=new DateTime('now',new DateTimeZone('Europe/Chisinau'));list($sem,$semStart,$weekNum,$weekParity)=computeSemesterAndWeek($today);error_log("Semester: $sem; starts on ".$semStart->format('Y-m-d')."; week #$weekNum ($weekParity)");function getCurrentWeekType():string{$today=new DateTime('now',new DateTimeZone('Europe/Chisinau'));[,,,$weekType]=computeSemesterAndWeek($today);return $weekType;}
+>>>>>>> Stashed changes
