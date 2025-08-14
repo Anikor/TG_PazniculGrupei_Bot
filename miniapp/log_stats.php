@@ -1,5 +1,6 @@
 <?php
-// miniapp/log_stats.php
+// miniapp/log_stats.php — Clean dashboard layout (single-period view)
+
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
 
@@ -8,284 +9,285 @@ header('Access-Control-Allow-Headers: Content-Type');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 
-// Who's viewing?
+// Who’s viewing?
 $tg_id = (int)($_GET['tg_id'] ?? 0);
 $user  = getUserByTgId($tg_id) ?: exit('Invalid user');
-
-// Access: monitors/moderators/admins; students can view their own marks,
-// but this page aggregates group-level activity, so keep it to staff roles.
-$role = $user['role'] ?? 'student';
-if (!in_array($role, ['admin','monitor','moderator'], true)) {
+if (!in_array($user['role'] ?? 'student', ['admin','monitor','moderator'], true)) {
   http_response_code(403);
   exit('Access denied');
 }
 
-// Optional filter: group_id (0 / missing => "All groups")
-$selectedGroupId = (int)($_GET['group_id'] ?? 0);
+// Group filter (0 = All)
+$selectedGroupId = (int)($_GET['group_id'] ?? ($user['group_id'] ?? 0));
 
-// Theme
-$theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
-$themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
+// Period selector: w=Week, m=Month, a=All
+$period = $_GET['period'] ?? 'w';
+$period = in_array($period, ['w','m','a'], true) ? $period : 'w';
 
-// Periods
 $tz = new DateTimeZone('Europe/Chisinau');
 $today = new DateTimeImmutable('today', $tz);
 $weekStart  = new DateTimeImmutable('monday this week', $tz);
 $monthStart = $today->modify('first day of this month');
 
-$periods = [
-  'This Week'  => [$weekStart->format('Y-m-d'), $today->format('Y-m-d')],
-  'This Month' => [$monthStart->format('Y-m-d'), $today->format('Y-m-d')],
-  'All Time'   => [null, null],
-];
+$rangeLabel = ['w'=>'This Week', 'm'=>'This Month', 'a'=>'All Time'][$period];
+$start = $period === 'w' ? $weekStart->format('Y-m-d') : ($period === 'm' ? $monthStart->format('Y-m-d') : null);
+$end   = $period === 'a' ? null : $today->format('Y-m-d');
 
-// Load all groups (for filter + loop)
-$groups = [];
-$stmt = $pdo->query("SELECT id, name FROM `groups` ORDER BY name");
-while ($g = $stmt->fetch(PDO::FETCH_ASSOC)) $groups[] = $g;
-if ($selectedGroupId > 0) {
-  $groups = array_values(array_filter($groups, fn($g)=> (int)$g['id'] === $selectedGroupId));
-}
+// Groups for dropdown
+$groups = $pdo->query("SELECT id,name FROM `groups` ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
 
 // Helpers
-function groupClause(&$params, $groupId) {
-  if ($groupId > 0) { $params[':gid'] = $groupId; return " AND s.group_id = :gid "; }
-  return "";
+function groupClause(&$p, $gid) { if ($gid > 0) { $p[':gid']=$gid; return " AND s.group_id=:gid "; } return ""; }
+function dateClause(&$p, $start, $end, $col='a.date') {
+  $cl=''; if ($start){$p[':start']=$start; $cl.=" AND $col>=:start ";} if($end){$p[':end']=$end; $cl.=" AND $col<=:end ";} return $cl;
 }
-function dateClause(&$params, $start, $end, $col = 'a.date') {
-  $clause = '';
-  if ($start) { $params[':start'] = $start; $clause .= " AND $col >= :start "; }
-  if ($end)   { $params[':end']   = $end;   $clause .= " AND $col <= :end "; }
-  return $clause;
-}
-function fetchMarkers(PDO $pdo, array $ids): array {
+function fetchUserNames(PDO $pdo, array $ids): array {
   if (!$ids) return [];
   $in = implode(',', array_fill(0, count($ids), '?'));
-  $stm = $pdo->prepare("SELECT id,name FROM users WHERE id IN ($in)");
-  $stm->execute($ids);
-  $out = [];
-  while ($r = $stm->fetch(PDO::FETCH_ASSOC)) $out[(int)$r['id']] = $r['name'];
+  $st = $pdo->prepare("SELECT id,name FROM users WHERE id IN ($in)");
+  $st->execute($ids);
+  $out=[]; while($r=$st->fetch(PDO::FETCH_ASSOC)) $out[(int)$r['id']]=$r['name'];
   return $out;
 }
+
+// Build KPIs (for selected group OR all groups)
+$params=[]; $gc=groupClause($params,$selectedGroupId); $dc=dateClause($params,$start,$end,'a.date');
+$sqlTotals="
+  SELECT COUNT(*) total,
+         SUM(a.present=1) present_cnt,
+         SUM(a.motivated=1) mot_cnt,
+         COUNT(DISTINCT a.marked_by) uniq_markers
+  FROM attendance a
+  JOIN schedule s ON s.id=a.schedule_id
+  WHERE 1=1 $gc $dc
+";
+$stm=$pdo->prepare($sqlTotals); $stm->execute($params);
+$tot=$stm->fetch(PDO::FETCH_ASSOC) ?: ['total'=>0,'present_cnt'=>0,'mot_cnt'=>0,'uniq_markers'=>0];
+$totalMarks=(int)($tot['total']??0);
+$presentPct= $totalMarks? round(100*(int)$tot['present_cnt']/$totalMarks):0;
+$motivPct  = $totalMarks? round(100*(int)$tot['mot_cnt']/$totalMarks):0;
+$uniqMarkers=(int)($tot['uniq_markers']??0);
+
+// Leaderboard: Top markers
+$paramsM=[]; $gcM=groupClause($paramsM,$selectedGroupId); $dcM=dateClause($paramsM,$start,$end,'a.date');
+$sqlM="
+  SELECT a.marked_by uid, COUNT(*) cnt
+  FROM attendance a
+  JOIN schedule s ON s.id=a.schedule_id
+  WHERE a.marked_by IS NOT NULL $gcM $dcM
+  GROUP BY a.marked_by
+  ORDER BY cnt DESC
+  LIMIT 20
+";
+$rowsM=$pdo->prepare($sqlM); $rowsM->execute($paramsM); $rowsM=$rowsM->fetchAll(PDO::FETCH_ASSOC);
+$namesM=fetchUserNames($pdo, array_values(array_unique(array_map('intval', array_column($rowsM,'uid')))));
+$maxM=max([1, ...array_map(fn($r)=>(int)$r['cnt'],$rowsM)]);
+
+// Leaderboard: Top editors
+$paramsE=[]; $gcE=groupClause($paramsE,$selectedGroupId); $dcE=dateClause($paramsE,$start,$end,'l.changed_at');
+$sqlE="
+  SELECT l.changed_by uid, COUNT(*) cnt
+  FROM attendance_log l
+  JOIN attendance a ON a.id=l.attendance_id
+  JOIN schedule  s ON s.id=a.schedule_id
+  WHERE l.changed_by IS NOT NULL $gcE $dcE
+  GROUP BY l.changed_by
+  ORDER BY cnt DESC
+  LIMIT 20
+";
+$rowsE=$pdo->prepare($sqlE); $rowsE->execute($paramsE); $rowsE=$rowsE->fetchAll(PDO::FETCH_ASSOC);
+$namesE=fetchUserNames($pdo, array_values(array_unique(array_map('intval', array_column($rowsE,'uid')))));
+$maxE=max([1, ...array_map(fn($r)=>(int)$r['cnt'],$rowsE)]);
+
+// Breakdown: by subject
+$paramsS=[]; $gcS=groupClause($paramsS,$selectedGroupId); $dcS=dateClause($paramsS,$start,$end,'a.date');
+$sqlS="
+  SELECT s.subject subj,
+         COUNT(*)                 total,
+         SUM(a.present=1)         present_cnt,
+         SUM(a.motivated=1)       mot_cnt
+  FROM attendance a
+  JOIN schedule s ON s.id=a.schedule_id
+  WHERE 1=1 $gcS $dcS
+  GROUP BY s.subject
+  ORDER BY total DESC, s.subject
+  LIMIT 12
+";
+$rowsS=$pdo->prepare($sqlS); $rowsS->execute($paramsS); $rowsS=$rowsS->fetchAll(PDO::FETCH_ASSOC);
+
+// Breakdown: by weekday
+$paramsW=[]; $gcW=groupClause($paramsW,$selectedGroupId); $dcW=dateClause($paramsW,$start,$end,'a.date');
+$sqlW="
+  SELECT s.day_of_week dow,
+         COUNT(*) total,
+         SUM(a.present=1) present_cnt
+  FROM attendance a
+  JOIN schedule s ON s.id=a.schedule_id
+  WHERE 1=1 $gcW $dcW
+  GROUP BY s.day_of_week
+  ORDER BY FIELD(s.day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')
+";
+$rowsW=$pdo->prepare($sqlW); $rowsW->execute($paramsW); $rowsW=$rowsW->fetchAll(PDO::FETCH_ASSOC);
+$maxW=max([1, ...array_map(fn($r)=>(int)$r['total'],$rowsW)]);
+
+// Theme
+$theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
+$themeLabel = ($theme==='dark') ? 'Dark' : 'Light';
+
+// Small helpers
+function pct($num,$den){ return $den? round(100*$num/$den):0; }
+function h($s){ return htmlspecialchars((string)$s, ENT_QUOTES); }
 ?>
 <!DOCTYPE html>
 <html lang="en" class="<?= $theme==='dark' ? 'dark-theme' : '' ?>">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Log Statistics</title>
-  <link rel="stylesheet" href="style.css?v=1">
+  <link rel="stylesheet" href="style.css?v=2">
   <script src="script.js" defer></script>
 </head>
 <body>
-<br>
-<div id="theme-switch">
-  <label class="switch">
-    <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
-    <span class="slider"></span>
-  </label>
-  <span id="theme-label"><?= htmlspecialchars($themeLabel, ENT_QUOTES) ?></span>
-</div>
-<br>
 
-<div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
-  <button class="btn-nav" onclick="location.href='greeting.php?tg_id=<?= (int)$tg_id ?>&when=today'">← Back to Greeting</button>
-  <form method="get" style="display:flex;gap:.5rem;align-items:center">
-    <input type="hidden" name="tg_id" value="<?= (int)$tg_id ?>">
-    <label>Group:
-      <select name="group_id">
-        <option value="0"<?= $selectedGroupId===0?' selected':'' ?>>All</option>
-        <?php
-        $allGroups = $pdo->query("SELECT id,name FROM `groups` ORDER BY name")->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($allGroups as $g):
-        ?>
-        <option value="<?= (int)$g['id'] ?>"<?= $selectedGroupId===(int)$g['id']?' selected':'' ?>>
-          <?= htmlspecialchars($g['name'], ENT_QUOTES) ?>
-        </option>
-        <?php endforeach; ?>
-      </select>
+<!-- Top bar -->
+<div class="topbar">
+  <div class="left">
+    <div>
+    <a class="btn-nav" href="greeting.php?tg_id=<?= (int)$tg_id ?>&when=today">← Back to Schedule</a><br><br>
+  <div id="theme-switch">
+    <label class="switch">
+      <input type="checkbox" id="theme-toggle" <?= $theme==='dark'?'checked':'' ?>>
+      <span class="slider"></span>
     </label>
-    <button class="btn-nav" type="submit">Apply</button>
-  </form>
-</div>
+    <span id="theme-label"><?= h($themeLabel) ?></span>
+  </div></div></div></div>
+    <form method="get" class="filters">
+      <input type="hidden" name="tg_id" value="<?= (int)$tg_id ?>">
+      <label>Group:
+        <select name="group_id">
+          <option value="0"<?= $selectedGroupId===0?' selected':'' ?>>All</option>
+          <?php foreach ($groups as $g): ?>
+          <option value="<?= (int)$g['id'] ?>"<?= $selectedGroupId===(int)$g['id']?' selected':'' ?>><?= h($g['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      </label>
 
-<h2>📈 Log Statistics</h2>
-<p style="margin: 6px 0 18px">Leaderboards for <em>marks</em> (who created entries) and <em>edits</em> (who changed entries), per group and period.</p>
+      <div class="segmented">
+        <?php
+          $base = 'log_stats.php?tg_id='.$tg_id.'&group_id='.$selectedGroupId.'&period=';
+        ?>
+        <a class="<?= $period==='w'?'active':'' ?>" href="<?= $base ?>w">Week</a>
+        <a class="<?= $period==='m'?'active':'' ?>" href="<?= $base ?>m">Month</a>
+        <a class="<?= $period==='a'?'active':'' ?>" href="<?= $base ?>a">All</a>
+      </div>
 
-<?php if (empty($groups)): ?>
-  <p>No groups found.</p>
-<?php endif; ?>
+      <button class="btn-nav" type="submit">Apply</button>
+    </form>
+  </div>
 
-<?php
-foreach ($groups as $grp):
-  $gid = (int)$grp['id'];
-  $gname = $grp['name'];
 
-  echo '<h3 style="margin-top:1.5rem">Group: ' . htmlspecialchars($gname, ENT_QUOTES) . '</h3>';
 
-  foreach ($periods as $label => [$start, $end]):
+<h2>📊 Log Statistics — <?= h($rangeLabel) ?></h2>
 
-    // -------- Summary cards (total marks, unique markers, edits, present%, motivated%) --------
-    $p = [];
-    $gc = groupClause($p, $gid);
-    $dc = dateClause($p, $start, $end, 'a.date');
-    $sqlTotals = "
-      SELECT
-        COUNT(*) AS total,
-        SUM(a.present=1) AS present_cnt,
-        SUM(a.motivated=1) AS mot_cnt
-      FROM attendance a
-      JOIN schedule s ON s.id = a.schedule_id
-      WHERE 1=1 $gc $dc
-    ";
-    $tot = $pdo->prepare($sqlTotals); $tot->execute($p);
-    $T = $tot->fetch(PDO::FETCH_ASSOC) ?: ['total'=>0,'present_cnt'=>0,'mot_cnt'=>0];
-    $totalMarks = (int)($T['total'] ?? 0);
-    $presentPct = $totalMarks ? round(100*(int)$T['present_cnt']/$totalMarks) : 0;
-    $motivatedPct = $totalMarks ? round(100*(int)$T['mot_cnt']/$totalMarks) : 0;
+<!-- KPI grid -->
+<section class="kpis">
+  <div class="kpi"><div class="kpi-label">Total marks</div><div class="kpi-value"><?= $totalMarks ?></div></div>
+  <div class="kpi"><div class="kpi-label">Unique markers</div><div class="kpi-value"><?= $uniqMarkers ?></div></div>
+  <div class="kpi"><div class="kpi-label">Present</div><div class="kpi-value"><?= $presentPct ?>%</div></div>
+  <div class="kpi"><div class="kpi-label">Motivated</div><div class="kpi-value"><?= $motivPct ?>%</div></div>
+</section>
 
-    // Unique markers
-    $p2 = [];
-    $gc2 = groupClause($p2, $gid);
-    $dc2 = dateClause($p2, $start, $end, 'a.date');
-    $sqlUniqueMarkers = "
-      SELECT COUNT(DISTINCT a.marked_by) AS uniq_markers
-      FROM attendance a JOIN schedule s ON s.id=a.schedule_id
-      WHERE a.marked_by IS NOT NULL $gc2 $dc2
-    ";
-    $stmUM = $pdo->prepare($sqlUniqueMarkers); $stmUM->execute($p2);
-    $uniqMarkers = (int)($stmUM->fetchColumn() ?: 0);
+<!-- Two-column leaderboards -->
+<section class="grid-2">
+  <div class="panel">
+    <div class="panel-title">Top markers</div>
+    <?php if (!$rowsM): ?>
+      <p class="muted">No data.</p>
+    <?php else: ?>
+      <table class="compact">
+        <thead><tr><th>#</th><th>User</th><th>Marks</th><th style="width:45%">Activity</th></tr></thead>
+        <tbody>
+          <?php $rank=1; foreach ($rowsM as $r): $cnt=(int)$r['cnt']; $nm=$namesM[(int)$r['uid']] ?? ('ID'.$r['uid']); ?>
+          <tr>
+            <td><?= $rank++ ?></td>
+            <td><?= h($nm) ?></td>
+            <td><?= $cnt ?></td>
+            <td>
+              <div class="progress"><span style="width:<?= round(100*$cnt/$maxM) ?>%"></span></div>
+            </td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
 
-    // Total edits in period (from log)
-    $p3 = [];
-    $gc3 = groupClause($p3, $gid);
-    // attendance_log uses changed_at
-    $dc3 = dateClause($p3, $start, $end, 'l.changed_at');
-    $sqlEdits = "
-      SELECT COUNT(*) AS edits
-      FROM attendance_log l
-      JOIN attendance a ON a.id=l.attendance_id
-      JOIN schedule  s ON s.id=a.schedule_id
-      WHERE 1=1 $gc3 $dc3
-    ";
-    $stmE = $pdo->prepare($sqlEdits); $stmE->execute($p3);
-    $totalEdits = (int)($stmE->fetchColumn() ?: 0);
+  <div class="panel">
+    <div class="panel-title">Top editors</div>
+    <?php if (!$rowsE): ?>
+      <p class="muted">No data.</p>
+    <?php else: ?>
+      <table class="compact">
+        <thead><tr><th>#</th><th>User</th><th>Edits</th><th style="width:45%">Activity</th></tr></thead>
+        <tbody>
+          <?php $rank=1; foreach ($rowsE as $r): $cnt=(int)$r['cnt']; $nm=$namesE[(int)$r['uid']] ?? ('ID'.$r['uid']); ?>
+          <tr>
+            <td><?= $rank++ ?></td>
+            <td><?= h($nm) ?></td>
+            <td><?= $cnt ?></td>
+            <td><div class="progress"><span style="width:<?= round(100*$cnt/$maxE) ?>%"></span></div></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+</section>
 
-    echo '<div class="stat-cards">';
-    echo '  <div class="stat"><h3>'.htmlspecialchars($label,ENT_QUOTES).'</h3><p>Total marks: <strong>'.$totalMarks.'</strong></p></div>';
-    echo '  <div class="stat"><h3>Markers</h3><p>Unique: <strong>'.$uniqMarkers.'</strong></p></div>';
-    echo '  <div class="stat"><h3>Edits</h3><p>Actions: <strong>'.$totalEdits.'</strong></p></div>';
-    echo '  <div class="stat"><h3>Quality</h3><p>Present: <strong>'.$presentPct.'%</strong> &nbsp; • &nbsp; Motivated: <strong>'.$motivatedPct.'%</strong></p></div>';
-    echo '</div>';
+<!-- Two-column breakdowns -->
+<section class="grid-2">
+  <div class="panel">
+    <div class="panel-title">By subject</div>
+    <?php if (!$rowsS): ?>
+      <p class="muted">No data.</p>
+    <?php else: ?>
+      <table class="compact">
+        <thead><tr><th>Subject</th><th>Total</th><th>Present%</th><th>Motivated%</th></tr></thead>
+        <tbody>
+          <?php foreach ($rowsS as $r): $t=(int)$r['total']; ?>
+          <tr>
+            <td><?= h($r['subj']) ?></td>
+            <td><?= $t ?></td>
+            <td><?= pct((int)$r['present_cnt'],$t) ?>%</td>
+            <td><?= pct((int)$r['mot_cnt'],$t) ?>%</td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
 
-    // -------- Leaderboard: Markers (who created entries) --------
-    $pM = [];
-    $gcM = groupClause($pM, $gid);
-    $dcM = dateClause($pM, $start, $end, 'a.date');
-    $sqlMarkers = "
-      SELECT a.marked_by AS uid, COUNT(*) AS cnt
-      FROM attendance a
-      JOIN schedule s ON s.id=a.schedule_id
-      WHERE a.marked_by IS NOT NULL $gcM $dcM
-      GROUP BY a.marked_by
-      ORDER BY cnt DESC
-      LIMIT 20
-    ";
-    $stmM = $pdo->prepare($sqlMarkers); $stmM->execute($pM);
-    $rowsM = $stmM->fetchAll(PDO::FETCH_ASSOC);
-    $idsM  = array_column($rowsM, 'uid');
-    $namesM= fetchMarkers($pdo, array_values(array_unique(array_map('intval',$idsM))));
-
-    // -------- Leaderboard: Editors (from full change log) --------
-    $pL = [];
-    $gcL = groupClause($pL, $gid);
-    $dcL = dateClause($pL, $start, $end, 'l.changed_at');
-    $sqlEditors = "
-      SELECT l.changed_by AS uid, COUNT(*) AS cnt
-      FROM attendance_log l
-      JOIN attendance a ON a.id=l.attendance_id
-      JOIN schedule  s ON s.id=a.schedule_id
-      WHERE l.changed_by IS NOT NULL $gcL $dcL
-      GROUP BY l.changed_by
-      ORDER BY cnt DESC
-      LIMIT 20
-    ";
-    $stmL = $pdo->prepare($sqlEditors); $stmL->execute($pL);
-    $rowsL = $stmL->fetchAll(PDO::FETCH_ASSOC);
-    $idsL  = array_column($rowsL, 'uid');
-    $namesL= fetchMarkers($pdo, array_values(array_unique(array_map('intval',$idsL))));
-
-    // -------- Bonus: Motivations added by marker (count where motivated=1 AND motivation not null) --------
-    $pMo = [];
-    $gcMo = groupClause($pMo, $gid);
-    $dcMo = dateClause($pMo, $start, $end, 'a.date');
-    $sqlMotiv = "
-      SELECT a.marked_by AS uid, COUNT(*) AS cnt
-      FROM attendance a
-      JOIN schedule s ON s.id=a.schedule_id
-      WHERE a.marked_by IS NOT NULL AND a.motivated=1 AND a.motivation IS NOT NULL $gcMo $dcMo
-      GROUP BY a.marked_by
-      ORDER BY cnt DESC
-      LIMIT 20
-    ";
-    $stmMo = $pdo->prepare($sqlMotiv); $stmMo->execute($pMo);
-    $rowsMo = $stmMo->fetchAll(PDO::FETCH_ASSOC);
-    $idsMo  = array_column($rowsMo, 'uid');
-    $namesMo= fetchMarkers($pdo, array_values(array_unique(array_map('intval',$idsMo))));
-
-    // ---- Render 3 compact tables as “cards” ----
-    echo '<div class="cards">';
-
-    // Markers
-    echo '<div class="card">';
-    echo '<h3>Top markers — '.htmlspecialchars($label,ENT_QUOTES).'</h3>';
-    if (!$rowsM) { echo '<p>No data.</p>'; }
-    else {
-      echo '<table><thead><tr><th>#</th><th>User</th><th>Marks</th></tr></thead><tbody>';
-      $rank=1;
-      foreach ($rowsM as $r) {
-        $nm = $namesM[(int)$r['uid']] ?? ('ID'.$r['uid']);
-        echo '<tr><td>'.$rank++.'</td><td>'.htmlspecialchars($nm,ENT_QUOTES).'</td><td>'.(int)$r['cnt'].'</td></tr>';
-      }
-      echo '</tbody></table>';
-    }
-    echo '</div>';
-
-    // Editors
-    echo '<div class="card">';
-    echo '<h3>Top editors — '.htmlspecialchars($label,ENT_QUOTES).'</h3>';
-    if (!$rowsL) { echo '<p>No data.</p>'; }
-    else {
-      echo '<table><thead><tr><th>#</th><th>User</th><th>Edits</th></tr></thead><tbody>';
-      $rank=1;
-      foreach ($rowsL as $r) {
-        $nm = $namesL[(int)$r['uid']] ?? ('ID'.$r['uid']);
-        echo '<tr><td>'.$rank++.'</td><td>'.htmlspecialchars($nm,ENT_QUOTES).'</td><td>'.(int)$r['cnt'].'</td></tr>';
-      }
-      echo '</tbody></table>';
-    }
-    echo '</div>';
-
-    // Motivations
-    echo '<div class="card">';
-    echo '<h3>Motivations added — '.htmlspecialchars($label,ENT_QUOTES).'</h3>';
-    if (!$rowsMo) { echo '<p>No data.</p>'; }
-    else {
-      echo '<table><thead><tr><th>#</th><th>User</th><th>Motivations</th></tr></thead><tbody>';
-      $rank=1;
-      foreach ($rowsMo as $r) {
-        $nm = $namesMo[(int)$r['uid']] ?? ('ID'.$r['uid']);
-        echo '<tr><td>'.$rank++.'</td><td>'.htmlspecialchars($nm,ENT_QUOTES).'</td><td>'.(int)$r['cnt'].'</td></tr>';
-      }
-      echo '</tbody></table>';
-    }
-    echo '</div>';
-
-    echo '</div>'; // .cards
-
-  endforeach; // each period
-endforeach;   // each group
-?>
+  <div class="panel">
+    <div class="panel-title">By weekday</div>
+    <?php if (!$rowsW): ?>
+      <p class="muted">No data.</p>
+    <?php else: ?>
+      <table class="compact">
+        <thead><tr><th>Day</th><th>Total</th><th>Present%</th><th style="width:45%">Load</th></tr></thead>
+        <tbody>
+          <?php foreach ($rowsW as $r): $t=(int)$r['total']; ?>
+          <tr>
+            <td><?= h($r['dow']) ?></td>
+            <td><?= $t ?></td>
+            <td><?= pct((int)$r['present_cnt'],$t) ?>%</td>
+            <td><div class="progress"><span style="width:<?= round(100*$t/$maxW) ?>%"></span></div></td>
+          </tr>
+          <?php endforeach; ?>
+        </tbody>
+      </table>
+    <?php endif; ?>
+  </div>
+</section>
 
 </body>
 </html>
