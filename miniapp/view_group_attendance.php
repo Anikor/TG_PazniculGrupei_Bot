@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // miniapp/view_group_attendance.php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
