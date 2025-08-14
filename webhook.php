@@ -1,19 +1,19 @@
-﻿<?php
+<?php
 require_once 'bot.php';
 echo 'OK';
 
 
 // webhook.php
 
-// 1️⃣ Load config & DB helpers
+// Load config & DB helpers
 require_once __DIR__ . '/config.php';  // defines BOT_TOKEN, TELEGRAM_API_URL, etc.
 require_once __DIR__ . '/db.php';      // defines $pdo, getUserByTgId()
 
-// 2️⃣ Read the incoming Telegram update
+//  Read the incoming Telegram update
 $body   = file_get_contents('php://input');
 $update = json_decode($body, true);
 
-// 3️⃣ Check for Web App submissions
+// Check for Web App submissions
 if (isset($update['message']['web_app_data'])) {
     // a) Extract the user’s Telegram ID
     $tg_id   = $update['message']['from']['id'];
@@ -21,7 +21,7 @@ if (isset($update['message']['web_app_data'])) {
     $rawData = $update['message']['web_app_data']['data'];
     $payload = json_decode($rawData, true);
 
-    // 4️⃣ Look up your internal user
+    //  Look up your internal user
     $user = getUserByTgId($tg_id);
     if (!$user) {
         // Unknown user – nothing to do
@@ -29,7 +29,7 @@ if (isset($update['message']['web_app_data'])) {
         exit;
     }
 
-    // 5️⃣ Prepare the INSERT statement
+    // Prepare the INSERT statement
     $stmt = $pdo->prepare("
       INSERT INTO attendance 
         (user_id, schedule_id, date, present, motivated, motivation, marked_by)
@@ -37,7 +37,7 @@ if (isset($update['message']['web_app_data'])) {
         (:user_id, :schedule_id, :dt, :present, :motivated, :motivation, :marked_by)
     ");
 
-    // 6️⃣ Loop & execute for each row
+    //  Loop & execute for each row
     $today = date('Y-m-d');
     foreach ($payload['attendance'] as $row) {
         $stmt->execute([
@@ -51,7 +51,7 @@ if (isset($update['message']['web_app_data'])) {
         ]);
     }
 
-    // 7️⃣ Send a confirmation back into the chat
+    // Send a confirmation back into the chat
     $chat_id = $update['message']['chat']['id'];
     $text    = "✅ Attendance saved for {$today}.";
     file_get_contents(
@@ -60,7 +60,7 @@ if (isset($update['message']['web_app_data'])) {
       . "&text=" . urlencode($text)
     );
 
-    // 8️⃣ Done
+    // Done
     http_response_code(200);
     exit;
 }

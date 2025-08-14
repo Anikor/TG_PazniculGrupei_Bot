@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // poll.php
 
   // POINT to greeting.php instead of index.html, no tg_id param
