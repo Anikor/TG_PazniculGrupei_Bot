@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/oe_weeks.php';
@@ -128,6 +128,7 @@ $groupName = $grp['name'] ?? ('Group ' . $user['group_id']);
 
 /* Server-paint theme to prevent flicker */
 $theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
+$themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
 ?>
 <!DOCTYPE html>
 <html lang="en" class="<?= $theme==='dark' ? 'dark-theme' : '' ?>">
@@ -136,6 +137,7 @@ $theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Log Attendance</title>
   <link rel="stylesheet" href="style.css?v=1">
+  <!-- script.js should add html.js-ready; CSS can hide #theme-switch until then -->
   <script src="script.js?v=nav-global-2" defer></script>
 </head>
 <body
@@ -145,13 +147,13 @@ $theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
   data-tg-id="<?= (int)$tg_id ?>"
 >
 <br>
-<!-- Theme toggle -->
+<!-- Theme toggle (pre-checked + correct label from server-side theme) -->
 <div id="theme-switch">
   <label class="switch">
-    <input type="checkbox" id="theme-toggle">
+    <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
     <span class="slider"></span>
   </label>
-  <span id="theme-label">Light</span>
+  <span id="theme-label"><?= $themeLabel ?></span>
 </div>
 <br><br>
 
