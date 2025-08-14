@@ -16,17 +16,21 @@ if (!in_array($user['role'], ['admin','monitor','moderator'], true)) {
   exit('Access denied');
 }
 
+$actor_tg = (int)($_GET['actor_tg'] ?? 0);
+$actor    = $actor_tg ? getUserByTgId($actor_tg) : null;
+$editorId = $actor['id'] ?? $user['id'];
+
 $stmt = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
 $stmt->execute([$user['group_id']]);
 $grp = $stmt->fetch(PDO::FETCH_ASSOC);
 $groupName = $grp['name'] ?? 'Group ' . $user['group_id'];
 
 $offset   = intval($_GET['offset'] ?? 0);
-$date     = date('Y-m-d', strtotime("$offset days"));
+$date     = date('Y-m-d', strtotime(($offset >= 0 ? '+' : '').$offset.' days'));
 $dayLabel = match (true) {
   $offset ===  0 => 'Today',
   $offset === -1 => 'Yesterday',
-  default        => abs($offset) . ' days ago'
+  default        => ($offset < 0 ? abs($offset).' days ago' : '+'.$offset.' days')
 };
 
 $tz = new DateTimeZone('Europe/Chisinau');
@@ -36,7 +40,7 @@ $dt = new DateTime($date, $tz);
 $schedule = getScheduleForDate($tg_id, $date, $weekType);
 
 // Centralized restriction (pass $schedule for moderator’s dynamic cutoff)
-[$canEdit, $lockReason] = can_user_edit_for_date($user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
+[$canEdit, $lockReason] = can_user_edit_for_date($actor['role'] ?? $user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
 $editingLocked          = !$canEdit;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
@@ -107,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
         $ins->execute([
           ':uid'=>$uid, ':sid'=>$sid, ':dt'=>$date,
           ':pres'=>$new_pres, ':mot'=>$new_mot, ':reason'=>$new_reason,
-          ':editor'=>$user['id'],
+          ':editor'=>$editorId,
         ]);
         continue;
       }
@@ -118,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
         $log->execute([
           ':att_id'    => $old['id'],
-          ':editor'    => $user['id'],
+          ':editor'    => $editorId,
           ':old_pres'  => $old['present'],
           ':new_pres'  => $new_pres,
           ':old_mot'   => $old['motivated'],
@@ -129,7 +133,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
         $upd->execute([
           ':pres'=>$new_pres, ':mot'=>$new_mot, ':reason'=>$new_reason,
-          ':editor'=>$user['id'], ':att_id'=>$old['id'],
+          ':editor'=>$editorId, ':att_id'=>$old['id'],
         ]);
       }
     }
@@ -263,7 +267,7 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
                      id="mot_<?= $s['id'] . '_' . $stu['id'] ?>"
                      <?= $mot ? 'checked' : '' ?><?= $disabled ?>>
               Motivated
-            </label><br>
+            </label>
             <input type="text"
                    id="mot_text_<?= $s['id'] . '_' . $stu['id'] ?>"
                    class="motiv-text"

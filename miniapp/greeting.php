@@ -1,22 +1,23 @@
 <?php
-
+// miniapp/greeting.php
 session_start();
 
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $data = json_decode(file_get_contents('php://input'), true);
-  if (!empty($data['tg_id']) && ctype_digit((string)$data['tg_id'])) {
-    $_SESSION['tg_id'] = (int)$data['tg_id'];
-  }
-  exit;
-}
-
-
+/* ---------- Theme (avoid flicker) ---------- */
 $cookieTheme = $_COOKIE['theme'] ?? 'light';
 $theme       = ($cookieTheme === 'dark') ? 'dark' : 'light';
 $themeClass  = ($theme === 'dark') ? 'dark-theme' : '';
 
+/* ---------- Telegram bootstrap: set identity once ---------- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST'
+    && str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
+  $data = json_decode(file_get_contents('php://input'), true) ?: [];
+  if (!empty($data['tg_id']) && ctype_digit((string)$data['tg_id'])) {
+    $_SESSION['tg_id'] = (int)$data['tg_id']; // fixed identity
+  }
+  exit;
+}
 
+/* ---------- First visit: tiny shell; JS will POST tg_id ---------- */
 if (!isset($_SESSION['tg_id'])) {
   ?>
   <!DOCTYPE html>
@@ -26,25 +27,22 @@ if (!isset($_SESSION['tg_id'])) {
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <title>Loading…</title>
     <link rel="stylesheet" href="style.css">
-    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="script.js"></script>
   </head>
-  <body>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <div id="tg-bootstrap"></div>
-  </body>
+  <body><div id="tg-bootstrap"></div></body>
   </html>
   <?php
   exit;
 }
 
-
+/* ---------- Includes ---------- */
 header('Content-Type: text/html; charset=UTF-8');
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/oe_weeks.php';
 
-
+/* ---------- Helpers ---------- */
 function initials(string $s): string {
   $stop  = ['of','and','the','de','la','si','și','în','din','ale','a','cu'];
   $parts = preg_split('/[\s\-]+/u', trim($s), -1, PREG_SPLIT_NO_EMPTY);
@@ -56,30 +54,96 @@ function initials(string $s): string {
   }
   return $out ?: mb_strtoupper(mb_substr($s, 0, 1, 'UTF-8'), 'UTF-8');
 }
+function groupIdByName(PDO $pdo, string $name): ?int {
+  $q = $pdo->prepare("SELECT id FROM `groups` WHERE name = ? LIMIT 1");
+  $q->execute([$name]);
+  $gid = $q->fetchColumn();
+  return $gid ? (int)$gid : null;
+}
+function proxyTgIdForGroup(PDO $pdo, int $group_id): ?int {
+  try {
+    $q = $pdo->prepare("
+      SELECT tg_id
+        FROM users
+       WHERE group_id = ?
+       ORDER BY (role='student') DESC, id ASC
+       LIMIT 1
+    ");
+    $q->execute([$group_id]);
+    $tg = $q->fetchColumn();
+    return $tg ? (int)$tg : null;
+  } catch (Throwable $e) { return null; }
+}
 
-
+/* ---------- Identity (always you) ---------- */
 $session_tg_id = (int)$_SESSION['tg_id'];
-$user          = getUserByTgId($session_tg_id);
-if (!$user) { http_response_code(400); exit('Error: invalid or unregistered Telegram ID'); }
+$session_user  = getUserByTgId($session_tg_id);
+if (!$session_user) { http_response_code(400); exit('Error: invalid or unregistered Telegram ID'); }
 
-$tg_id = $session_tg_id;               
-if ($user['role'] === 'admin' && isset($_GET['tg_id']) && ctype_digit((string)$_GET['tg_id'])) {
+/* ---------- Buttons mapping ---------- */
+/* Primary = view-mode (no impersonation), Secondary = impersonation */
+$PRIMARY_GROUP_NAME = 'AI-241';
+$SECONDARY_TG_ID    = 878801928; // Ochisor Nicolae
+
+/* ---------- View / Reset via links (no identity change) ---------- */
+if (isset($_GET['view'])) {
+  $view = $_GET['view'];
+  if ($view === 'primary') {
+    $_SESSION['view_group_id'] = groupIdByName($pdo, $PRIMARY_GROUP_NAME);
+  } elseif ($view === 'reset') {
+    unset($_SESSION['view_group_id']);
+  }
+  $when = isset($_GET['when']) ? ('?when=' . urlencode($_GET['when'])) : '';
+  header('Location: greeting.php' . $when);
+  exit;
+}
+
+/* ---------- Impersonation (SECONDARY) ---------- */
+$active_tg_id  = $session_tg_id;
+$active_user   = $session_user;
+$impersonating = false;
+
+if (($session_user['role'] ?? '') === 'admin'
+    && isset($_GET['tg_id']) && ctype_digit((string)$_GET['tg_id'])) {
   $as_tg_id = (int)$_GET['tg_id'];
   $as_user  = getUserByTgId($as_tg_id);
-  if ($as_user) { $tg_id = $as_tg_id; $user = $as_user; }
-}
-$impersonating = ($tg_id !== $session_tg_id);
-
-
-$weekType = getCurrentWeekType();      
-$subgroup = $user['subgroup'] ?? null;
-
-
-if (($session_tg_id === $_SESSION['tg_id']) && isset($user['role']) && $user['role'] === 'admin' && isset($_GET['group_id'])) {
-  $g = (int)$_GET['group_id']; if ($g > 0) $user['group_id'] = $g;
+  if ($as_user) {
+    $active_tg_id  = $as_tg_id;
+    $active_user   = $as_user;
+    $impersonating = true;
+    // When impersonating, ignore any view override:
+    unset($_SESSION['view_group_id']);
+  }
 }
 
+/* ---------- Effective group to DISPLAY ---------- */
+$effective_group_id = $impersonating
+  ? (int)$active_user['group_id']
+  : ((isset($_SESSION['view_group_id']) && $_SESSION['view_group_id'])
+      ? (int)$_SESSION['view_group_id']
+      : (int)$active_user['group_id']);
 
+/* ---------- Week/date/schedule (proxy only for view-mode) ---------- */
+$weekType = getCurrentWeekType();
+
+$view_tg_id    = $active_tg_id;                     // whose schedule to read
+$view_subgroup = $active_user['subgroup'] ?? null;  // and which subgroup
+
+if (!$impersonating && $effective_group_id !== (int)$active_user['group_id']) {
+  // PRIMARY view-mode: fetch a proxy student in that group (to get correct subgroup + schedule)
+  if ($proxy = proxyTgIdForGroup($pdo, $effective_group_id)) {
+    $view_tg_id = $proxy;
+    if ($proxy_user = getUserByTgId($proxy)) {
+      $view_subgroup = $proxy_user['subgroup'] ?? null;
+    } else {
+      $view_subgroup = null;
+    }
+  } else {
+    $view_subgroup = null;
+  }
+}
+
+/* ---------- Time scope ---------- */
 $when      = $_GET['when'] ?? 'today';
 $schedule  = [];
 $label     = '';
@@ -89,13 +153,13 @@ switch ($when) {
   case 'yesterday':
     $date     = date('Y-m-d', strtotime('-1 day'));
     $label    = 'Yesterday (' . date('d M Y', strtotime('-1 day')) . ')';
-    $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+    $schedule = getScheduleForDate($view_tg_id, $date, $weekType, $view_subgroup);
     break;
 
   case 'tomorrow':
     $date     = date('Y-m-d', strtotime('+1 day'));
     $label    = 'Tomorrow (' . date('d M Y', strtotime('+1 day')) . ')';
-    $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+    $schedule = getScheduleForDate($view_tg_id, $date, $weekType, $view_subgroup);
     break;
 
   case 'week':
@@ -109,7 +173,7 @@ switch ($when) {
          FIELD(day_of_week,'Monday','Tuesday','Wednesday','Thursday','Friday'),
          STR_TO_DATE(SUBSTRING_INDEX(time_slot,'-',1),'%H:%i')
     ");
-    $stmt->execute([$user['group_id']]);
+    $stmt->execute([$effective_group_id]);
     $all = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $dayLabels = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
@@ -122,13 +186,13 @@ switch ($when) {
   default:
     $date     = date('Y-m-d');
     $label    = 'Today (' . date('d M Y') . ')';
-    $schedule = getScheduleForDate($tg_id, $date, $weekType, $subgroup);
+    $schedule = getScheduleForDate($view_tg_id, $date, $weekType, $view_subgroup);
     break;
 }
 
-
-$tableLayout = $_COOKIE['tableLayout'] ?? 'small'; 
-$baseUri     = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');  
+/* ---------- CSS assets / layout toggles ---------- */
+$tableLayout = $_COOKIE['tableLayout'] ?? 'small';
+$baseUri     = rtrim(dirname($_SERVER['SCRIPT_NAME']), '/\\');
 $bigPath     = __DIR__ . '/tableb.css';
 $smallPath   = __DIR__ . '/tablec.css';
 $stylePath   = __DIR__ . '/style.css';
@@ -136,30 +200,30 @@ $cssStyleUrl = $baseUri . '/style.css?v='   . (file_exists($stylePath) ? filemti
 $cssBigUrl   = $baseUri . '/tableb.css?v='  . (file_exists($bigPath)   ? filemtime($bigPath)   : time());
 $cssSmallUrl = $baseUri . '/tablec.css?v='  . (file_exists($smallPath) ? filemtime($smallPath) : time());
 
-
-$impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
+/* Persist impersonation across nav */
+$impQ = $impersonating ? ('&tg_id=' . urlencode((string)$active_tg_id)) : '';
 ?>
 <!DOCTYPE html>
 <html lang="en" class="<?= $themeClass ?>">
 <head>
-  
-  <script src="script.js"></script>
-
-  <link rel="stylesheet" href="style.css">
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Greeting</title>
 
-  
+  <link rel="stylesheet" href="<?= htmlspecialchars($cssStyleUrl, ENT_QUOTES) ?>">
   <link rel="stylesheet" href="<?= htmlspecialchars($cssSmallUrl, ENT_QUOTES) ?>" id="css-small" media="all">
   <?php if ($when === 'week'): ?>
-  <link rel="stylesheet" href="<?= htmlspecialchars($cssBigUrl, ENT_QUOTES) ?>" id="css-big"
-        media="<?= ($tableLayout==='big') ? 'all' : 'not all' ?>">
+    <link rel="stylesheet" href="<?= htmlspecialchars($cssBigUrl, ENT_QUOTES) ?>" id="css-big"
+          media="<?= ($tableLayout==='big') ? 'all' : 'not all' ?>">
   <?php endif; ?>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="script.js"></script>
 </head>
 <body>
   <br>
-  
+
+  <!-- Theme + (week layout) toggles -->
   <div id="theme-switch">
     <label class="switch">
       <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
@@ -167,7 +231,6 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
     </label>
     <span id="theme-label"><?= $theme === 'dark' ? 'Dark' : 'Light' ?></span>
 
-    
     <?php if ($when === 'week'): ?>
       <label class="switch" style="margin-left:.75rem">
         <input type="checkbox" id="table-toggle"><span class="slider"></span>
@@ -176,11 +239,13 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
     <?php endif; ?>
   </div>
 
-  <br><br><h1>Hello, <?= htmlspecialchars($user['name'], ENT_QUOTES) ?>!</h1>
-  <?php if ($user['role'] !== 'student'): ?>
-    <p>Role: <strong><?= ucfirst(htmlspecialchars($user['role'])) ?></strong></p>
+  <!-- Use ACTIVE user for greeting & role (fixes Secondary) -->
+  <br><br><h1>Hello, <?= htmlspecialchars($active_user['name'], ENT_QUOTES) ?>!</h1>
+  <?php if (($active_user['role'] ?? 'student') !== 'student'): ?>
+    <p>Role: <strong><?= ucfirst(htmlspecialchars($active_user['role'])) ?></strong></p>
   <?php endif; ?>
 
+  <!-- Top nav -->
   <nav>
     <a class="btn" href="?when=yesterday<?= $impQ ?>">← Yesterday</a>
     <a class="btn" href="?when=today<?= $impQ ?>">Today</a>
@@ -189,7 +254,7 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
   </nav>
 
   <h2><?= htmlspecialchars($label, ENT_QUOTES) ?>’s Schedule</h2>
-  <p>This is an <span class="week-type <?= $weekType ?>"><?= ucfirst($weekType) ?></span> week.</p>
+  <p>This is an <span class="week-type <?= htmlspecialchars($weekType) ?>"><?= ucfirst($weekType) ?></span> week.</p>
 
 <?php if ($when === 'week'): ?>
   <?php if (empty($grid)): ?>
@@ -312,14 +377,15 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 
 <?php else: ?>
 
-  
   <table>
     <thead><tr><th>Time</th><th>Type</th><th>Subject</th><th>Location</th></tr></thead>
     <tbody>
       <?php foreach ($schedule as $r): ?>
         <tr>
           <td><?= htmlspecialchars($r['time_slot'], ENT_QUOTES) ?></td>
-          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>><?= htmlspecialchars($r['type'], ENT_QUOTES) ?></td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
+            <?= htmlspecialchars($r['type'], ENT_QUOTES) ?>
+          </td>
           <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
             <?php $subject = $r['subject']; ?>
             <span class="subject" aria-label="<?= htmlspecialchars($subject) ?>">
@@ -327,7 +393,9 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
               <abbr class="subject-short" title="<?= htmlspecialchars($subject) ?>"><?= htmlspecialchars(initials($subject)) ?></abbr>
             </span>
           </td>
-          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>><?= htmlspecialchars($r['location'] ?? '', ENT_QUOTES) ?></td>
+          <td<?= !empty($r['week_type']) ? ' class="week-cell '.$r['week_type'].'"' : '' ?>>
+            <?= htmlspecialchars($r['location'] ?? '', ENT_QUOTES) ?>
+          </td>
         </tr>
       <?php endforeach; ?>
     </tbody>
@@ -335,18 +403,34 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$tg_id)) : '';
 
 <?php endif; ?>
 
+  <!-- Bottom actions -->
   <div style="margin-top:1rem;">
-    <?php if (in_array($user['role'], ['admin','monitor','moderator'], true)): ?>
-      <a class="btn btn-primary" href="index.php?tg_id=<?= (int)$tg_id ?>&when=<?= urlencode($when) ?>">📝 Log Attendance</a>
+    <?php if (in_array(($session_user['role'] ?? ''), ['admin','monitor','moderator'], true)): ?>
+      <?php if ($impersonating): ?>
+        <a class="btn btn-primary"
+           href="index.php?tg_id=<?= (int)$active_tg_id ?>&group_id=<?= (int)$effective_group_id ?>&when=<?= urlencode($when) ?>">📝 Log Attendance</a>
+      <?php else: ?>
+        <a class="btn btn-primary"
+           href="index.php?tg_id=<?= (int)$session_tg_id ?>&group_id=<?= (int)$effective_group_id ?>&when=<?= urlencode($when) ?>">📝 Log Attendance</a>
+      <?php endif; ?>
     <?php endif; ?>
-    <a class="btn btn-primary" href="view_attendance.php?tg_id=<?= (int)$tg_id ?>">📊 View My Attendance</a>
-    <?php if (in_array($user['role'], ['monitor','admin'], true)): ?>
-      <a class="btn btn-primary" href="view_group_attendance.php?tg_id=<?= (int)$tg_id ?>&group_id=<?= (int)$user['group_id'] ?>">👥 View Group Attendance</a>
-      <a class="btn btn-primary" href="export.php?tg_id=<?= (int)$tg_id ?>&group_id=<?= (int)$user['group_id'] ?>">📥 Export Attendance</a>
-      <?php if ($session_tg_id === $_SESSION['tg_id'] && getUserByTgId($session_tg_id)['role'] === 'admin'): ?>
-        
-        <a class="btn btn-primary" href="greeting.php?tg_id=348442139<?= '&when=' . urlencode($when) ?>">Primary</a>
-        <a class="btn btn-primary" href="greeting.php?tg_id=878801928<?= '&when=' . urlencode($when) ?>">Secondary</a>
+
+    <a class="btn btn-primary"
+       href="view_attendance.php?tg_id=<?= (int)($impersonating ? $active_tg_id : $session_tg_id) ?>">📊 View My Attendance</a>
+
+    <?php if (in_array(($session_user['role'] ?? ''), ['monitor','admin'], true)): ?>
+      <a class="btn btn-primary"
+         href="view_group_attendance.php?tg_id=<?= (int)($impersonating ? $active_tg_id : $session_tg_id) ?>&group_id=<?= (int)$effective_group_id ?>">👥 View Group Attendance</a>
+      <a class="btn btn-primary"
+         href="export.php?tg_id=<?= (int)($impersonating ? $active_tg_id : $session_tg_id) ?>&group_id=<?= (int)$effective_group_id ?>">📥 Export Attendance</a>
+    <?php endif; ?>
+
+    <?php if (($session_user['role'] ?? '') === 'admin'): ?>
+      <!-- Admin-only: Primary (view mode), Secondary (impersonate), Reset -->
+      <a class="btn btn-primary" href="greeting.php?view=primary<?= '&when=' . urlencode($when) ?>">Primary</a>
+      <a class="btn btn-primary" href="greeting.php?tg_id=<?= (int)$SECONDARY_TG_ID . '&when=' . urlencode($when) ?>">Secondary</a>
+      <?php if (!empty($_SESSION['view_group_id']) || $impersonating): ?>
+        <a class="btn btn-primary" href="greeting.php?view=reset<?= '&when=' . urlencode($when) ?>">Reset</a>
       <?php endif; ?>
     <?php endif; ?>
   </div>

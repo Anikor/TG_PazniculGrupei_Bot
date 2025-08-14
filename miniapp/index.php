@@ -31,8 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     exit;
   }
 
+  $actor_tg = (int)($_GET['actor_tg'] ?? 0);
+  $actor    = $actor_tg ? getUserByTgId($actor_tg) : null;
+  $actorId  = $actor['id']   ?? $user['id'];
+  $actorName= $actor['name'] ?? ($user['name'] ?? 'Unknown');
+
   $offset = (int)($_GET['offset'] ?? 0);
-  $date   = date('Y-m-d', strtotime("$offset days"));
+  $date   = date('Y-m-d', strtotime(($offset >= 0 ? '+' : '').$offset.' days'));
 
   // Build schedule for the target date (needed for moderator cutoff)
   $tz = new DateTimeZone('Europe/Chisinau');
@@ -41,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
   $schedule = getScheduleForDate($tg_id, $date, $weekType);
 
   // Centralized block (pass $schedule for dynamic moderator cutoff)
-  [$canEdit, $lockReason] = can_user_edit_for_date($user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
+  [$canEdit, $lockReason] = can_user_edit_for_date($actor['role'] ?? $user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
   if (!$canEdit) {
     http_response_code(403);
     echo json_encode(['success'=>false,'error'=>$lockReason ?: 'Editing window closed.']);
@@ -65,13 +70,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
         ':pres'   => !empty($r['present'])   ? 1 : 0,
         ':mot'    => !empty($r['motivated']) ? 1 : 0,
         ':reason' => trim((string)($r['motivation'] ?? '')) ?: null,
-        ':mb'     => (int)$user['id'],
+        ':mb'     => (int)$actorId, // credit the ACTOR (you)
       ]);
     }
     $pdo->commit();
     echo json_encode([
       'success' => true,
-      'marked_by_name' => $user['name'] ?? 'Unknown',
+      'marked_by_name' => $actorName, // show you
       'date' => $date,
     ]);
   } catch (Throwable $e) {
@@ -84,19 +89,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
 $tg_id  = (int)($_GET['tg_id']  ?? 0);
 $offset = (int)($_GET['offset'] ?? 0);
-$date   = date('Y-m-d', strtotime("$offset days"));
+$actor_tg = (int)($_GET['actor_tg'] ?? 0);
 
+$date   = date('Y-m-d', strtotime(($offset >= 0 ? '+' : '').$offset.' days'));
 $dayLabel = match (true) {
   $offset ===  0 => 'Today',
   $offset === -1 => 'Yesterday',
-  default        => abs($offset) . ' days ago'
+  default        => ($offset < 0 ? abs($offset).' days ago' : '+'.$offset.' days')
 };
-
 $prev1 = $offset - 1;
 $prev2 = $offset - 2;
 $next1 = $offset + 1;
 
 $user = getUserByTgId($tg_id) ?: exit('Invalid user');
+$actor = $actor_tg ? (getUserByTgId($actor_tg) ?: $user) : $user;
 
 $tz = new DateTimeZone('Europe/Chisinau');
 $dt = new DateTime($date, $tz);
@@ -141,7 +147,7 @@ $grp       = $stmG->fetch(PDO::FETCH_ASSOC);
 $groupName = $grp['name'] ?? ('Group ' . $user['group_id']);
 
 // Centralized restriction for UI (pass schedule for moderator cutoff)
-[$canEdit, $lockReason] = can_user_edit_for_date($user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
+[$canEdit, $lockReason] = can_user_edit_for_date($actor['role'] ?? $user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
 $editingLocked          = !$canEdit;
 
 $theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
@@ -159,7 +165,7 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
 <body
   data-day-label="<?= htmlspecialchars($dayLabel, ENT_QUOTES) ?>"
   data-date-dmy="<?= htmlspecialchars(date('d.m.Y', strtotime($date)), ENT_QUOTES) ?>"
-  data-current-user-name="<?= htmlspecialchars($user['name'] ?? 'Unknown', ENT_QUOTES) ?>"
+  data-current-user-name="<?= htmlspecialchars(($actor['name'] ?? $user['name'] ?? 'Unknown'), ENT_QUOTES) ?>"
   data-tg-id="<?= (int)$tg_id ?>"
   data-edit-locked="<?= $editingLocked ? '1' : '0' ?>"
   data-lock-reason="<?= htmlspecialchars($lockReason ?? '', ENT_QUOTES) ?>"
@@ -176,15 +182,15 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
 <br><br>
 
 <div style="margin-top:6px;">
-  <button class="btn-nav" onclick="nav(<?= $prev2 ?>)">« <?= abs($prev2) ?>d</button>
-  <button class="btn-nav" onclick="nav(<?= $prev1 ?>)">← <?= abs($prev1) ?>d</button>
+  <button class="btn-nav" onclick="nav(<?= $prev2 ?>, <?= (int)$tg_id ?>, <?= (int)$actor_tg ?>)">« <?= abs($prev2) ?>d</button>
+  <button class="btn-nav" onclick="nav(<?= $prev1 ?>, <?= (int)$tg_id ?>, <?= (int)$actor_tg ?>)">← <?= abs($prev1) ?>d</button>
   <?php if ($offset!==0): ?>
-    <button class="btn-nav" onclick="nav(0)">Today</button>
+    <button class="btn-nav" onclick="nav(0, <?= (int)$tg_id ?>, <?= (int)$actor_tg ?>)">Today</button>
   <?php endif; ?>
   <?php if ($offset < 0): ?>
-    <button class="btn-nav" onclick="nav(<?= $next1 ?>)">→ 1d</button>
+    <button class="btn-nav" onclick="nav(<?= $next1 ?>, <?= (int)$tg_id ?>, <?= (int)$actor_tg ?>)">→ 1d</button>
   <?php endif; ?>
-  <button class="btn-nav" onclick="location.href='greeting.php?tg_id=<?= $tg_id ?>'">
+  <button class="btn-nav" onclick="location.href='greeting.php?tg_id=<?= $tg_id ?>&offset=<?= $offset ?>&actor_tg=<?= (int)$actor_tg ?>&viewer_tg=<?= (int)$actor_tg ?>'">
     Back to Schedule
   </button>
 </div>
@@ -268,11 +274,22 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
   <?php if (empty($existing) && !$editingLocked): ?>
     <button class="btn-submit">Submit Attendance</button>
   <?php elseif (!empty($existing) && !$editingLocked): ?>
-    <button class="btn-edit" onclick="location.href='edit_attendance.php?tg_id=<?= $tg_id ?>&offset=<?= $offset ?>'">
+    <button class="btn-edit" onclick="location.href='edit_attendance.php?tg_id=<?= $tg_id ?>&offset=<?= $offset ?>&actor_tg=<?= (int)$actor_tg ?>'">
       Edit Attendance
     </button>
   <?php endif; ?>
 
 <?php endif; ?>
+<script>
+  // nav(offset, tg, actor) helper keeps impersonation + actor threaded
+  function nav(off, tg, actor) {
+    const p = new URLSearchParams({
+      tg_id: String(tg||<?= (int)$tg_id ?>),
+      offset: String(off),
+      actor_tg: String(actor||<?= (int)$actor_tg ?>)
+    });
+    location.href = 'index.php?' + p.toString();
+  }
+</script>
 </body>
 </html>
