@@ -1,13 +1,8 @@
 <?php
-// db.php
+
 require_once __DIR__ . '/config.php';
 
-/**
- * Find user record by Telegram user ID
- *
- * @param  int       $tg_id
- * @return array|null
- */
+
 function getUserByTgId(int $tg_id): ?array {
     global $pdo;
     $stmt = $pdo->prepare(
@@ -19,15 +14,10 @@ function getUserByTgId(int $tg_id): ?array {
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
-/**
- * Get schedule rows for today, based on user's group
- *
- * @param  int   $tg_id
- * @return array
- */
+
 function getTodaySchedule(int $tg_id): array {
     global $pdo;
-    $day  = date('l'); // e.g. "Monday"
+    $day  = date('l'); 
     $user = getUserByTgId($tg_id);
     if (!$user) return [];
 
@@ -49,12 +39,7 @@ function getTodaySchedule(int $tg_id): array {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/**
- * Get list of users in the same group
- *
- * @param  int   $group_id
- * @return array
- */
+
 function getGroupStudents(int $group_id): array {
     global $pdo;
     $stmt = $pdo->prepare(
@@ -67,15 +52,7 @@ function getGroupStudents(int $group_id): array {
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/**
- * Record attendance: who marked (by tg_id), which student, schedule slot, and present flag
- *
- * @param  int   $marker_tg
- * @param  int   $user_id
- * @param  int   $schedule_id
- * @param  bool  $present
- * @return bool
- */
+
 function markAttendance(int $marker_tg, int $user_id, int $schedule_id, bool $present): bool {
     global $pdo;
     $marker = getUserByTgId($marker_tg);
@@ -94,26 +71,21 @@ function markAttendance(int $marker_tg, int $user_id, int $schedule_id, bool $pr
     ]);
 }
 
-/**
- * Get simple attendance stats for a user
- *
- * @param  int   $tg_id
- * @return array|null
- */
+
 function getUserStats(int $tg_id): ?array {
     global $pdo;
     $user = getUserByTgId($tg_id);
     if (!$user) return null;
     $uid = $user['id'];
 
-    // total attendance records
+    
     $stmt = $pdo->prepare(
       "SELECT COUNT(*) FROM attendance WHERE user_id = ?"
     );
     $stmt->execute([$uid]);
     $total = (int)$stmt->fetchColumn();
 
-    // present count
+    
     $stmt = $pdo->prepare(
       "SELECT COUNT(*) FROM attendance WHERE user_id = ? AND present = TRUE"
     );
@@ -127,18 +99,10 @@ function getUserStats(int $tg_id): ?array {
     ];
 }
 
-/**
- * Get schedule rows for a specific date, filtering odd/even weeks and subgroup.
- *
- * @param  int         $tg_id      Telegram user ID
- * @param  string      $date       Date in 'YYYY-MM-DD' format
- * @param  string|null $weekType   'odd' or 'even' (NULL = every week)
- * @param  int|null    $subgroup   1 or 2 (NULL = all students)
- * @return array                   Array of schedule rows
- */
+
 function getScheduleForDate(int $tg_id, string $date, ?string $weekType = null, ?int $subgroup = null): array {
     global $pdo;
-    $dayName = date('l', strtotime($date)); // e.g. "Tuesday"
+    $dayName = date('l', strtotime($date)); 
 
     $sql = "
         SELECT
@@ -171,14 +135,7 @@ function getScheduleForDate(int $tg_id, string $date, ?string $weekType = null, 
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
-/**
- * Get this week's schedule (Monday–Friday), filtering odd/even weeks and subgroup.
- *
- * @param  int         $tg_id      Telegram user ID
- * @param  string|null $weekType   'odd' or 'even' (NULL = every week)
- * @param  int|null    $subgroup   1 or 2 (NULL = all students)
- * @return array                   Array of schedule rows
- */
+
 function getWeekSchedule(int $tg_id, ?string $weekType = null, ?int $subgroup = null): array {
     global $pdo;
 
