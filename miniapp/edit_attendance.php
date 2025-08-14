@@ -180,7 +180,8 @@ if (!empty($schedule)) {
 }
 
 // Server-paint theme to avoid flicker
-$theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
+$theme      = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
+$themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
 ?>
 <!DOCTYPE html>
 <html lang="en" class="<?= $theme==='dark' ? 'dark-theme' : '' ?>">
@@ -200,10 +201,10 @@ $theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
 <br>
 <div id="theme-switch">
   <label class="switch">
-    <input type="checkbox" id="theme-toggle">
+    <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
     <span class="slider"></span>
   </label>
-  <span id="theme-label">Light</span>
+  <span id="theme-label"><?= $themeLabel ?></span>
 </div>
 <br><br>
 

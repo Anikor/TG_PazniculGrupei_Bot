@@ -22,26 +22,29 @@ if (! in_array($user['role'], ['admin','monitor','moderator'], true)) {
 $group_id = intval($_GET['group_id'] ?? $user['group_id']);
 $action   = $_GET['action']   ?? '';
 
-// — 2) Helper: render a styled HTML menu —
+// — 2) Helper: render a styled HTML menu (server-paints theme to avoid flicker) —
 function render_page(string $title, array $links, int $tg_id, int $group_id) {
+    $theme      = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
+    $themeClass = ($theme === 'dark') ? 'dark-theme' : '';
+    $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
     ?><!DOCTYPE html>
-    <html lang="en">
+    <html lang="en" class="<?= $themeClass ?>">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       <title><?= htmlspecialchars($title) ?></title>
 
-      <!-- Early theme + shared behaviors (no inline JS needed) -->
+      <!-- Early theme + shared behaviors (no inline JS) -->
       <script src="script.js"></script>
       <link rel="stylesheet" href="style.css">
     </head>
     <body>
       <div id="theme-switch">
         <label class="switch">
-          <input type="checkbox" id="theme-toggle">
+          <input type="checkbox" id="theme-toggle" <?= $theme === 'dark' ? 'checked' : '' ?>>
           <span class="slider"></span>
         </label>
-        <span id="theme-label">Light</span>
+        <span id="theme-label"><?= $themeLabel ?></span>
       </div>
 
       <br><br>
