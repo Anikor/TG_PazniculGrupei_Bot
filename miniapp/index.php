@@ -4,11 +4,24 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/oe_weeks.php';
 require_once __DIR__ . '/time_restrict.php';
 
+/* ───────── Helpers ───────── */
+function proxyTgIdForGroup(PDO $pdo, int $group_id): ?int {
+  try {
+    $q = $pdo->prepare("SELECT tg_id FROM users WHERE group_id=? ORDER BY (role='student') DESC, id ASC LIMIT 1");
+    $q->execute([$group_id]);
+    $tg = $q->fetchColumn();
+    return $tg ? (int)$tg : null;
+  } catch (Throwable $e) {
+    return null;
+  }
+}
+
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 
+/* ───────── JSON SAVE ───────── */
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
     && str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
 
@@ -31,6 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     exit;
   }
 
+  // Who is marking (credit the ACTOR)
   $actor_tg = (int)($_GET['actor_tg'] ?? 0);
   $actor    = $actor_tg ? getUserByTgId($actor_tg) : null;
   $actorId  = $actor['id']   ?? $user['id'];
@@ -39,11 +53,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
   $offset = (int)($_GET['offset'] ?? 0);
   $date   = date('Y-m-d', strtotime(($offset >= 0 ? '+' : '').$offset.' days'));
 
-  // Build schedule for the target date (needed for moderator cutoff)
+  // Determine effective group (override for Primary view-mode)
+  $groupOverride      = (int)($_GET['group_id'] ?? 0);
+  $effectiveGroupId   = $groupOverride > 0 ? $groupOverride : (int)$user['group_id'];
+
+  // Build schedule for the target date using a proper proxy tg from the effective group
   $tz = new DateTimeZone('Europe/Chisinau');
   $dt = new DateTime($date, $tz);
   [, , , $weekType] = computeSemesterAndWeek($dt);
-  $schedule = getScheduleForDate($tg_id, $date, $weekType);
+
+  if ($groupOverride > 0) {
+    $proxyTg = proxyTgIdForGroup($pdo, $effectiveGroupId) ?? $tg_id;
+    $schedule = getScheduleForDate($proxyTg, $date, $weekType);
+  } else {
+    $schedule = getScheduleForDate($tg_id, $date, $weekType);
+  }
 
   // Centralized block (pass $schedule for dynamic moderator cutoff)
   [$canEdit, $lockReason] = can_user_edit_for_date($actor['role'] ?? $user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
@@ -76,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
     $pdo->commit();
     echo json_encode([
       'success' => true,
-      'marked_by_name' => $actorName, // show you
+      'marked_by_name' => $actorName,
       'date' => $date,
     ]);
   } catch (Throwable $e) {
@@ -87,8 +111,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
   exit;
 }
 
-$tg_id  = (int)($_GET['tg_id']  ?? 0);
-$offset = (int)($_GET['offset'] ?? 0);
+/* ───────── PAGE (GET) ───────── */
+$tg_id    = (int)($_GET['tg_id']    ?? 0);
+$offset   = (int)($_GET['offset']   ?? 0);
 $actor_tg = (int)($_GET['actor_tg'] ?? 0);
 
 $date   = date('Y-m-d', strtotime(($offset >= 0 ? '+' : '').$offset.' days'));
@@ -101,16 +126,34 @@ $prev1 = $offset - 1;
 $prev2 = $offset - 2;
 $next1 = $offset + 1;
 
-$user = getUserByTgId($tg_id) ?: exit('Invalid user');
+$user  = getUserByTgId($tg_id) ?: exit('Invalid user');
 $actor = $actor_tg ? (getUserByTgId($actor_tg) ?: $user) : $user;
+
+// Effective group (override means Primary AI-241 view-mode)
+$requested_group_id  = (int)($_GET['group_id'] ?? 0);
+$effective_group_id  = $requested_group_id > 0 ? $requested_group_id : (int)$user['group_id'];
 
 $tz = new DateTimeZone('Europe/Chisinau');
 $dt = new DateTime($date, $tz);
 [, , , $weekType] = computeSemesterAndWeek($dt);
 
-$schedule = getScheduleForDate($tg_id, $date, $weekType);
-$students = getGroupStudents($user['group_id']);
+/* Use proxy tg for selected group so schedule matches AI-241 when Primary is on */
+if ($requested_group_id > 0) {
+  $proxy_tg = proxyTgIdForGroup($pdo, $effective_group_id) ?? $tg_id;
+  $schedule = getScheduleForDate($proxy_tg, $date, $weekType);
+  $students = getGroupStudents($effective_group_id);
+} else {
+  $schedule = getScheduleForDate($tg_id, $date, $weekType);
+  $students = getGroupStudents($user['group_id']);
+}
 
+/* Group name based on effective group */
+$stmG = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
+$stmG->execute([$effective_group_id]);
+$grp       = $stmG->fetch(PDO::FETCH_ASSOC);
+$groupName = $grp['name'] ?? ('Group ' . $effective_group_id);
+
+/* Preload existing marks for this day's schedule entries */
 $sids     = array_column($schedule, 'id');
 $existing = [];
 $markers  = [];
@@ -141,12 +184,7 @@ if ($sids) {
   }
 }
 
-$stmG = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
-$stmG->execute([$user['group_id']]);
-$grp       = $stmG->fetch(PDO::FETCH_ASSOC);
-$groupName = $grp['name'] ?? ('Group ' . $user['group_id']);
-
-// Centralized restriction for UI (pass schedule for moderator cutoff)
+/* Centralized restriction for UI (pass schedule for moderator cutoff) */
 [$canEdit, $lockReason] = can_user_edit_for_date($actor['role'] ?? $user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
 $editingLocked          = !$canEdit;
 
@@ -160,7 +198,7 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Log Attendance</title>
   <link rel="stylesheet" href="style.css?v=1">
-  <script src="script.js?v=nav-global-2" defer></script>
+  <script src="script.js?v=nav-global-3" defer></script>
 </head>
 <body
   data-day-label="<?= htmlspecialchars($dayLabel, ENT_QUOTES) ?>"
@@ -190,7 +228,7 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
   <?php if ($offset < 0): ?>
     <button class="btn-nav" onclick="nav(<?= $next1 ?>, <?= (int)$tg_id ?>, <?= (int)$actor_tg ?>)">→ 1d</button>
   <?php endif; ?>
-  <button class="btn-nav" onclick="location.href='greeting.php?tg_id=<?= $tg_id ?>&offset=<?= $offset ?>&actor_tg=<?= (int)$actor_tg ?>&viewer_tg=<?= (int)$actor_tg ?>'">
+  <button class="btn-nav" onclick="location.href='greeting.php?tg_id=<?= (int)$tg_id ?>&when=today'">
     Back to Schedule
   </button>
 </div>
@@ -274,21 +312,23 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
   <?php if (empty($existing) && !$editingLocked): ?>
     <button class="btn-submit">Submit Attendance</button>
   <?php elseif (!empty($existing) && !$editingLocked): ?>
-    <button class="btn-edit" onclick="location.href='edit_attendance.php?tg_id=<?= $tg_id ?>&offset=<?= $offset ?>&actor_tg=<?= (int)$actor_tg ?>'">
+    <!-- keep group_id when jumping to edit -->
+    <button class="btn-edit" onclick="location.href='edit_attendance.php?tg_id=<?= (int)$tg_id ?>&offset=<?= (int)$offset ?>&actor_tg=<?= (int)$actor_tg ?>&group_id=<?= (int)$effective_group_id ?>'">
       Edit Attendance
     </button>
   <?php endif; ?>
 
 <?php endif; ?>
 <script>
-  // nav(offset, tg, actor) helper keeps impersonation + actor threaded
+  // nav(offset, tg, actor) helper keeps existing query (incl. group_id)
   function nav(off, tg, actor) {
-    const p = new URLSearchParams({
-      tg_id: String(tg||<?= (int)$tg_id ?>),
-      offset: String(off),
-      actor_tg: String(actor||<?= (int)$actor_tg ?>)
-    });
-    location.href = 'index.php?' + p.toString();
+    const url = new URL(location.href);
+    const curG = url.searchParams.get('group_id'); // preserved automatically
+    url.searchParams.set('tg_id', String(tg || ''));
+    url.searchParams.set('offset', String(off));
+    if (actor) url.searchParams.set('actor_tg', String(actor));
+    url.searchParams.delete('when');
+    location.href = url.toString();
   }
 </script>
 </body>

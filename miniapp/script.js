@@ -1,6 +1,6 @@
 'use strict';
 
-// run after DOM is ready
+/* ===================== onReady helper ===================== */
 function onReady(fn) {
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', fn, { once: true });
@@ -9,19 +9,21 @@ function onReady(fn) {
   }
 }
 
-/* ---------------- nav(offset) ---------------- */
+/* ===================== nav(offset[, tg, actor]) ===================== */
+/* Preserves existing query params (incl. group_id) and optionally
+   overrides tg_id and/or actor_tg. Used by index.php day nav buttons. */
 (function () {
-  window.nav = function (off) {
+  window.nav = function (off, tgOpt, actorOpt) {
     const url = new URL(location.href);
-    const tg = url.searchParams.get('tg_id') || document.body.dataset.tgId || '';
-    if (tg && !url.searchParams.get('tg_id')) url.searchParams.set('tg_id', tg);
+    if (tgOpt)   url.searchParams.set('tg_id', String(tgOpt));
     url.searchParams.set('offset', String(off));
-    url.searchParams.delete('when');
+    if (actorOpt) url.searchParams.set('actor_tg', String(actorOpt));
+    url.searchParams.delete('when'); // normalize
     location.href = url.toString();
   };
 })();
 
-/* --------------- Telegram expand -------------- */
+/* ===================== Telegram expand (no-op if absent) ===================== */
 (function () {
   try {
     const tg = window.Telegram && window.Telegram.WebApp;
@@ -29,7 +31,7 @@ function onReady(fn) {
   } catch {}
 })();
 
-/* --------------- prepaint theme class --------- */
+/* ===================== prepaint theme class to avoid flicker ===================== */
 (function () {
   try {
     const html = document.documentElement;
@@ -39,7 +41,7 @@ function onReady(fn) {
   } catch {}
 })();
 
-/* --------------- theme toggle ----------------- */
+/* ===================== theme toggle (sync to cookie + localStorage) ===================== */
 onReady(function () {
   const root = document.documentElement;
   const toggle = document.getElementById('theme-toggle');
@@ -60,7 +62,7 @@ onReady(function () {
   });
 });
 
-/* --------------- period slider ---------------- */
+/* ===================== optional: period slider (if present) ===================== */
 onReady(function () {
   const slider = document.getElementById('period-slider');
   const out = document.getElementById('period-label');
@@ -87,7 +89,7 @@ onReady(function () {
   apply(parseInt(slider.value, 10) || 0);
 });
 
-/* --------------- table layout toggle ---------- */
+/* ===================== week table layout toggle (if present) ===================== */
 onReady(function () {
   const tableToggle = document.getElementById('table-toggle');
   const tableLabel  = document.getElementById('table-label');
@@ -117,7 +119,7 @@ onReady(function () {
   });
 });
 
-/* --------------- Telegram bootstrap ----------- */
+/* ===================== Telegram bootstrap (first visit shell) ===================== */
 onReady(function () {
   if (!document.getElementById('tg-bootstrap')) return;
 
@@ -144,18 +146,20 @@ onReady(function () {
   });
 });
 
-/* --------------- index: save attendance ------- */
+/* ===================== index.php: submit attendance ===================== */
 onReady(function () {
   const isIndex   = (document.body.dataset.page === 'index') || (!!document.getElementById('save-confirm'));
   if (!isIndex) return;
 
-  const submitBtn = document.querySelector('.btn-submit');
+  const submitBtn  = document.querySelector('.btn-submit');
   const saveBanner = document.getElementById('save-confirm');
   if (!submitBtn) return;
 
-  const escapeHtml = (s) =>
-    String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[c]));
+  const escapeHtml = (s) => String(s).replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[c])
+  );
 
+  // Hide/show motivation editor based on presence
   document.querySelectorAll('.att-toggle').forEach(chk => {
     chk.addEventListener('change', () => {
       const id = chk.id.replace('att_', '');
@@ -164,6 +168,7 @@ onReady(function () {
     });
   });
 
+  // Toggle motivation text visibility
   const syncMotTxt = (chk) => {
     const id  = chk.id.replace('mot_', '');
     const txt = document.getElementById('mot_text_' + id);
@@ -171,7 +176,6 @@ onReady(function () {
     if (chk.checked) txt.style.display = 'block';
     else { txt.style.display = 'none'; txt.value = ''; }
   };
-
   document.querySelectorAll('.mot-toggle').forEach(chk => {
     chk.addEventListener('change', () => syncMotTxt(chk));
     syncMotTxt(chk);
@@ -202,34 +206,42 @@ onReady(function () {
     try {
       const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(out) });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+      // some hosts echo HTML before JSON; try to extract trailing JSON object
       const text = await resp.text();
       const m = text.match(/\{[\s\S]*\}$/);
-      if (!m) throw new Error('Bad JSON');
-      const j = JSON.parse(m[0]);
+      const j = m ? JSON.parse(m[0]) : JSON.parse(text);
+
       if (!j.success) { alert('Save failed: ' + (j.error || 'unknown')); return; }
 
       if (saveBanner) saveBanner.style.display = 'block';
 
       const params = new URLSearchParams(location.search);
-      const tgId   = params.get('tg_id') || '';
-      const offset = params.get('offset') || '0';
+      const tgId   = params.get('tg_id')     || '';
+      const offset = params.get('offset')    || '0';
+      const gid    = params.get('group_id');              // keep AI-241 (Primary view-mode)
+      const actor  = params.get('actor_tg')  || '';       // keep actor
 
+      // Swap "Submit" with "Edit Attendance" preserving group_id and actor_tg
       const newBtn = document.createElement('button');
       newBtn.className = 'btn-edit';
       newBtn.type = 'button';
       newBtn.textContent = 'Edit Attendance';
       newBtn.addEventListener('click', () => {
-        location.href = `edit_attendance.php?tg_id=${encodeURIComponent(tgId)}&offset=${encodeURIComponent(offset)}`;
+        let href = `edit_attendance.php?tg_id=${encodeURIComponent(tgId)}&offset=${encodeURIComponent(offset)}`;
+        if (gid)   href += `&group_id=${encodeURIComponent(gid)}`;
+        if (actor) href += `&actor_tg=${encodeURIComponent(actor)}`;
+        location.href = href;
       });
       submitBtn.replaceWith(newBtn);
 
-      const byName = String(document.body.dataset.currentUserName || j.marked_by_name || 'Unknown')
-        .replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[c]));
+      const byName = escapeHtml(String(document.body.dataset.currentUserName || j.marked_by_name || 'Unknown'));
 
+      // Lock down toggles and show "By ..." per cell
       out.attendance.forEach(r => {
         const att = document.getElementById(`att_${r.schedule_id}_${r.user_id}`);
         if (!att) return;
-        att.checked = !!r.present;
+        att.checked  = !!r.present;
         att.disabled = true;
         const cont = document.getElementById(`mot_cont_${r.schedule_id}_${r.user_id}`);
         if (cont) {
@@ -239,7 +251,7 @@ onReady(function () {
           div.className = 'mot-reason';
           let html = '';
           if (!r.present && r.motivated && r.motivation) {
-            html += 'Reason: ' + (r.motivation || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;', "'":'&#39;'}[c])) + '<br>';
+            html += 'Reason: ' + escapeHtml(r.motivation || '') + '<br>';
           }
           html += `<em>By ${byName}</em>`;
           div.innerHTML = html;
@@ -255,13 +267,14 @@ onReady(function () {
   });
 });
 
-/* --------------- edit: save changes ----------- */
+/* ===================== edit_attendance.php: save changes ===================== */
 onReady(function () {
   if (document.body.dataset.page !== 'edit') return;
 
   const submitBtn = document.querySelector('.btn-submit');
   if (!submitBtn) return;
 
+  // Hide motivation UI when present is checked
   document.querySelectorAll('.att-toggle').forEach(chk => {
     const apply = () => {
       const id = chk.id.replace('att_', '');
@@ -272,6 +285,7 @@ onReady(function () {
     apply();
   });
 
+  // Motivation checkbox forces present OFF and enables text
   document.querySelectorAll('.mot-toggle').forEach(motChk => {
     const id = motChk.id.replace('mot_', '');
     const txt = document.getElementById('mot_text_' + id);
@@ -318,29 +332,19 @@ onReady(function () {
   });
 });
 
-/* ============ NEW: Primary / Reset view-mode buttons ============ */
+/* ===================== Optional: Primary / Reset view-mode buttons ===================== */
 onReady(function () {
   const primary = document.getElementById('btnPrimary');
   if (primary) {
-    primary.addEventListener('click', async () => {
-      await fetch('greeting.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ view_mode: 'ai241' }) // only set view mode; do not touch tg_id
-      });
-      location.reload();
+    primary.addEventListener('click', () => {
+      location.href = 'greeting.php?view=primary';
     });
   }
 
-  const reset = document.getElementById('btnResetView'); // optional
+  const reset = document.getElementById('btnResetView');
   if (reset) {
-    reset.addEventListener('click', async () => {
-      await fetch('greeting.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ view_mode: 'reset' })
-      });
-      location.reload();
+    reset.addEventListener('click', () => {
+      location.href = 'greeting.php?view=reset';
     });
   }
 });
