@@ -423,7 +423,11 @@ $impQ = $impersonating ? ('&tg_id=' . urlencode((string)$active_tg_id)) : '';
          href="view_group_attendance.php?tg_id=<?= (int)($impersonating ? $active_tg_id : $session_tg_id) ?>&group_id=<?= (int)$effective_group_id ?>">👥 View Group Attendance</a>
       <a class="btn btn-primary"
          href="export.php?tg_id=<?= (int)($impersonating ? $active_tg_id : $session_tg_id) ?>&group_id=<?= (int)$effective_group_id ?>">📥 Export Attendance</a>
-    <?php endif; ?>
+        <!-- NEW: Log Statistics -->
+    <a class="btn btn-primary"
+       href="log_stats.php?tg_id=<?= (int)($impersonating ? $active_tg_id : $session_tg_id) ?>&group_id=<?= (int)$effective_group_id ?>">📈 Log Statistics</a>
+
+         <?php endif; ?>
 
     <?php if (($session_user['role'] ?? '') === 'admin'): ?>
       <!-- Admin-only: Primary (view mode), Secondary (impersonate), Reset -->
