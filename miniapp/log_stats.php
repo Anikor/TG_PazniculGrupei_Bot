@@ -192,15 +192,10 @@ $themeLabel = ($theme==='dark') ? 'Dark' : 'Light';
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Log Statistics</title>
-  <link rel="stylesheet" href="style.css?v=7">
+  <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
 
   <!-- Minimal helpers to force two rows + remove underline -->
-  <style>
-    .topbar-stack{display:flex;flex-direction:column;gap:.4rem;width:100%}
-    .topbar-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
-    .no-underline{text-decoration:none !important}
-  </style>
 </head>
 <body>
 
