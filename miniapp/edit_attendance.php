@@ -1,17 +1,24 @@
 <?php
-// miniapp/edit_attendance.php
-
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/oe_weeks.php';
+require_once __DIR__ . '/time_restrict.php';
 
-// CORS / preflight
+/* ───────── Helpers ───────── */
+function proxyTgIdForGroup(PDO $pdo, int $group_id): ?int {
+  try {
+    $q = $pdo->prepare("SELECT tg_id FROM users WHERE group_id=? ORDER BY (role='student') DESC, id ASC LIMIT 1");
+    $q->execute([$group_id]);
+    $tg = $q->fetchColumn();
+    return $tg ? (int)$tg : null;
+  } catch (Throwable $e) { return null; }
+}
+
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
 
-// Lookup & guard
 $tg_id = intval($_GET['tg_id'] ?? 0);
 $user  = getUserByTgId($tg_id) ?: exit('Invalid user');
 if (!in_array($user['role'], ['admin','monitor','moderator'], true)) {
@@ -19,33 +26,56 @@ if (!in_array($user['role'], ['admin','monitor','moderator'], true)) {
   exit('Access denied');
 }
 
-// Group name
-$stmt = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
-$stmt->execute([$user['group_id']]);
-$grp = $stmt->fetch(PDO::FETCH_ASSOC);
-$groupName = $grp['name'] ?? 'Group ' . $user['group_id'];
+$actor_tg = (int)($_GET['actor_tg'] ?? 0);
+$actor    = $actor_tg ? getUserByTgId($actor_tg) : null;
+$editorId = $actor['id'] ?? $user['id'];
 
-// Date / labels
+/* Effective group (support Primary AI-241 view-mode) */
+$requested_group_id = (int)($_GET['group_id'] ?? 0);
+$effective_group_id = $requested_group_id > 0 ? $requested_group_id : (int)$user['group_id'];
+
+/* Group name */
+$stmt = $pdo->prepare("SELECT name FROM `groups` WHERE id=?");
+$stmt->execute([$effective_group_id]);
+$grp = $stmt->fetch(PDO::FETCH_ASSOC);
+$groupName = $grp['name'] ?? 'Group ' . $effective_group_id;
+
 $offset   = intval($_GET['offset'] ?? 0);
-$date     = date('Y-m-d', strtotime("$offset days"));
+$date     = date('Y-m-d', strtotime(($offset >= 0 ? '+' : '').$offset.' days'));
 $dayLabel = match (true) {
   $offset ===  0 => 'Today',
   $offset === -1 => 'Yesterday',
-  default        => abs($offset) . ' days ago'
+  default        => ($offset < 0 ? abs($offset).' days ago' : '+'.$offset.' days')
 };
 
-// Academic week type
-$dt = new DateTime($date, new DateTimeZone('Europe/Chisinau'));
+$tz = new DateTimeZone('Europe/Chisinau');
+$dt = new DateTime($date, $tz);
 [, , , $weekType] = computeSemesterAndWeek($dt);
 
-// Load lessons for that academic weekType
-$schedule = getScheduleForDate($tg_id, $date, $weekType);
+/* Use proxy tg for schedule when overriding group */
+if ($requested_group_id > 0) {
+  $proxy_tg = proxyTgIdForGroup($pdo, $effective_group_id) ?? $tg_id;
+  $schedule = getScheduleForDate($proxy_tg, $date, $weekType);
+} else {
+  $schedule = getScheduleForDate($tg_id, $date, $weekType);
+}
 
-// AJAX SAVE (update + optional insert + log)
+/* Centralized restriction (pass $schedule for moderator’s dynamic cutoff) */
+[$canEdit, $lockReason] = can_user_edit_for_date($actor['role'] ?? $user['role'] ?? '', new DateTimeImmutable($date, $tz), $tz, $schedule);
+$editingLocked          = !$canEdit;
+
+/* Save changes */
 if ($_SERVER['REQUEST_METHOD'] === 'POST'
     && str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
 
   header('Content-Type: application/json; charset=UTF-8');
+
+  if ($editingLocked) {
+    http_response_code(403);
+    echo json_encode(['success'=>false,'error'=>$lockReason ?: 'Editing window closed.']);
+    exit;
+  }
+
   $raw  = file_get_contents('php://input');
   $data = json_decode($raw, true);
   if (!$data || !isset($data['attendance'])) {
@@ -100,13 +130,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
       $new_reason = trim((string)($r['motivation'] ?? '')) ?: null;
 
       if (!$old) {
-        // brand new slot for this date
+        // First mark from edit page -> creates row with marked_by (no updated_by yet)
         $ins->execute([
           ':uid'=>$uid, ':sid'=>$sid, ':dt'=>$date,
           ':pres'=>$new_pres, ':mot'=>$new_mot, ':reason'=>$new_reason,
-          ':editor'=>$user['id'],
+          ':editor'=>$editorId,
         ]);
-        // (optional) log create: skip or add another INSERT if you want
         continue;
       }
 
@@ -115,11 +144,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
           $old['motivation'] !== $new_reason) {
 
         $log->execute([
-          ':att_id'    => $old['id'],
-          ':editor'    => $user['id'],
-          ':old_pres'  => $old['present'],
+          ':att_id'    => (int)$old['id'],
+          ':editor'    => $editorId,
+          ':old_pres'  => (int)$old['present'],
           ':new_pres'  => $new_pres,
-          ':old_mot'   => $old['motivated'],
+          ':old_mot'   => (int)$old['motivated'],
           ':new_mot'   => $new_mot,
           ':old_reason'=> $old['motivation'],
           ':new_reason'=> $new_reason,
@@ -127,7 +156,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
 
         $upd->execute([
           ':pres'=>$new_pres, ':mot'=>$new_mot, ':reason'=>$new_reason,
-          ':editor'=>$user['id'], ':att_id'=>$old['id'],
+          ':editor'=>$editorId, ':att_id'=>(int)$old['id'],
         ]);
       }
     }
@@ -142,14 +171,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST'
   exit;
 }
 
-// Render
-$students = getGroupStudents($user['group_id']);
+/* Students from the effective group */
+$students = getGroupStudents($effective_group_id);
 
-// existing attendance
+/* Preload for edit UI */
 $existing = [];
 $markers  = [];
 $updaters = [];
-
 if (!empty($schedule)) {
   $sids = array_column($schedule, 'id');
   $in   = implode(',', array_fill(0, count($sids), '?'));
@@ -163,8 +191,8 @@ if (!empty($schedule)) {
   $marker_ids = $editor_ids = [];
   while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
     $existing[$r['schedule_id']][$r['user_id']] = $r;
-    if (!empty($r['marked_by']))  $marker_ids[] = $r['marked_by'];
-    if (!empty($r['updated_by'])) $editor_ids[] = $r['updated_by'];
+    if (!empty($r['marked_by']))  $marker_ids[] = (int)$r['marked_by'];
+    if (!empty($r['updated_by'])) $editor_ids[] = (int)$r['updated_by'];
   }
 
   $all_ids = array_values(array_unique(array_merge($marker_ids, $editor_ids)));
@@ -179,7 +207,6 @@ if (!empty($schedule)) {
   }
 }
 
-// Server-paint theme to avoid flicker
 $theme      = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
 $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
 ?>
@@ -190,13 +217,15 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Edit Attendance — <?= htmlspecialchars($dayLabel) ?> (<?= date('d.m.Y',strtotime($date)) ?>)</title>
   <link rel="stylesheet" href="style.css?v=1">
-  <script src="script.js?v=nav-global-2" defer></script>
+  <script src="script.js?v=nav-global-4" defer></script>
 </head>
 <body
   data-page="edit"
   data-day-label="<?= htmlspecialchars($dayLabel, ENT_QUOTES) ?>"
   data-date-dmy="<?= htmlspecialchars(date('d.m.Y', strtotime($date)), ENT_QUOTES) ?>"
   data-tg-id="<?= (int)$tg_id ?>"
+  data-edit-locked="<?= $editingLocked ? '1' : '0' ?>"
+  data-lock-reason="<?= htmlspecialchars($lockReason ?? '', ENT_QUOTES) ?>"
 >
 <br>
 <div id="theme-switch">
@@ -216,13 +245,20 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
 <h2>Group: <?= htmlspecialchars($groupName, ENT_QUOTES) ?></h2><br>
 <h2>Edit attendance for <?= htmlspecialchars($dayLabel, ENT_QUOTES) ?> (<?= date('d.m.Y',strtotime($date)) ?>)</h2>
 
+<?php if ($editingLocked): ?>
+  <div class="edit-info" style="margin:8px 0;color:#c00">
+    <?= htmlspecialchars($lockReason) ?>
+  </div>
+<?php endif; ?>
+
 <?php if (empty($schedule)): ?>
   <p style="color:red;">No lessons for this day.</p>
 <?php else: ?>
+  <?php $disabled = $editingLocked ? ' disabled' : ''; ?>
   <table>
     <thead>
       <tr>
-        <th>#</th>
+        <th></th>
         <th>Student</th>
         <?php foreach ($schedule as $s): ?>
           <th><?= htmlspecialchars($s['time_slot']) ?><br><?= htmlspecialchars($s['subject']) ?></th>
@@ -239,13 +275,15 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
           $pres = $cell ? (int)$cell['present']   : 0;
           $mot  = $cell ? (int)$cell['motivated'] : 0;
           $txt  = $cell ? (string)($cell['motivation'] ?? '') : '';
+          $markedByName = $cell && !empty($cell['marked_by']) ? ($markers[$cell['marked_by']] ?? ('ID'.$cell['marked_by'])) : null;
+          $editedByName = $cell && !empty($cell['updated_by']) ? ($updaters[$cell['updated_by']] ?? ('ID'.$cell['updated_by'])) : null;
         ?>
         <td>
           <label class="switch">
             <input type="checkbox"
                    class="att-toggle"
                    id="att_<?= $s['id'] . '_' . $stu['id'] ?>"
-                   <?= $pres ? 'checked' : '' ?>>
+                   <?= $pres ? 'checked' : '' ?><?= $disabled ?>>
             <span class="slider"></span>
           </label>
 
@@ -254,20 +292,27 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
               <input type="checkbox"
                      class="mot-toggle"
                      id="mot_<?= $s['id'] . '_' . $stu['id'] ?>"
-                     <?= $mot ? 'checked' : '' ?>>
+                     <?= $mot ? 'checked' : '' ?><?= $disabled ?>>
               Motivated
-            </label>
+            </label><br>
             <input type="text"
                    id="mot_text_<?= $s['id'] . '_' . $stu['id'] ?>"
                    class="motiv-text"
                    placeholder="Reason…"
-                   value="<?= htmlspecialchars($txt, ENT_QUOTES) ?>">
+                   value="<?= htmlspecialchars($txt, ENT_QUOTES) ?>"
+                   <?= $disabled ?>>
           </div>
 
-          <?php if ($cell && !empty($cell['updated_by'])): ?>
-            <div class="edit-info">
-              Last edited by <?= htmlspecialchars($updaters[$cell['updated_by']] ?? ('ID'.$cell['updated_by']), ENT_QUOTES) ?>
-              at <?= htmlspecialchars($cell['updated_at'] ?? '', ENT_QUOTES) ?>
+          <?php if ($cell): ?>
+            <div class="edit-info" style="margin-top:.35rem">
+              <?php if ($markedByName): ?>
+                <div>Marked by <?= htmlspecialchars($markedByName, ENT_QUOTES) ?></div>
+              <?php endif; ?>
+              <?php if ($editedByName && !empty($cell['updated_at'])): ?>
+                <div class="mot-edited">
+                  <small>Last edited by <?= htmlspecialchars($editedByName, ENT_QUOTES) ?> at <?= htmlspecialchars($cell['updated_at'], ENT_QUOTES) ?></small>
+                </div>
+              <?php endif; ?>
             </div>
           <?php endif; ?>
         </td>
@@ -277,7 +322,9 @@ $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
     </tbody>
   </table>
 
-  <button class="btn-submit">Save changes</button>
+  <?php if (!$editingLocked): ?>
+    <button class="btn-submit">Save changes</button>
+  <?php endif; ?>
 <?php endif; ?>
 </body>
 </html>
