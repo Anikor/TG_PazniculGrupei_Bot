@@ -348,3 +348,13 @@ onReady(function () {
     });
   }
 });
+// Auto-apply group change on the stats page (no "Apply" click needed)
+onReady(function () {
+  const sel = document.querySelector('.filters select[name="group_id"]');
+  if (!sel) return;
+  sel.addEventListener('change', () => {
+    const url = new URL(location.href);
+    url.searchParams.set('group_id', sel.value);   // keep tg_id & period intact
+    location.href = url.toString();
+  });
+});
