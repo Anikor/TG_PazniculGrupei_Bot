@@ -161,3 +161,10 @@ table.compact td{font-size:.9rem}
     .topbar-stack{display:flex;flex-direction:column;gap:.4rem;width:100%}
     .topbar-row{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
     .no-underline{text-decoration:none !important}
+    /* Perfect attendance highlight */
+.card--perfect{
+  background:#69cc7f4f;  
+  border:1px dashed var(--btn);  
+  margin:12px 0;
+  text-align:center;
+}
