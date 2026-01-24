@@ -1,6 +1,8 @@
 # Ignore specific migration SQL file (keep out of VCS)
+.gitignore
 migration_slotid_time_slots.sql
 
 # Common sensible ignores
 .env
 /.env
+*.env.local
