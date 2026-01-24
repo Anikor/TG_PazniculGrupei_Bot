@@ -1,6 +1,0 @@
-# Ignore specific migration SQL file (keep out of VCS)
-migration_slotid_time_slots.sql
-
-# Common sensible ignores
-.env
-/.env
