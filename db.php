@@ -3,19 +3,19 @@
 require_once __DIR__ . '/config.php';
 
 
-function getUserByTgId(int $tg_id): ?array {
+function getUserByTgId($tg_id): ?array {
     global $pdo;
     $stmt = $pdo->prepare(
         "SELECT id, tg_id, name, role, group_id, subgroup
            FROM users
           WHERE tg_id = ?"
     );
-    $stmt->execute([$tg_id]);
+    $stmt->execute([(string)$tg_id]);
     return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
 }
 
 
-function getTodaySchedule(int $tg_id): array {
+function getTodaySchedule($tg_id): array {
     global $pdo;
     $day  = date('l'); 
     $user = getUserByTgId($tg_id);
@@ -35,7 +35,7 @@ function getTodaySchedule(int $tg_id): array {
          WHERE u.tg_id = ? AND s.day_of_week = ?
          ORDER BY s.time_slot"
     );
-    $stmt->execute([$tg_id, $day]);
+    $stmt->execute([(string)$tg_id, $day]);
     return $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -53,7 +53,7 @@ function getGroupStudents(int $group_id): array {
 }
 
 
-function markAttendance(int $marker_tg, int $user_id, int $schedule_id, bool $present): bool {
+function markAttendance($marker_tg, int $user_id, int $schedule_id, bool $present): bool {
     global $pdo;
     $marker = getUserByTgId($marker_tg);
     if (!$marker) return false;
@@ -72,7 +72,7 @@ function markAttendance(int $marker_tg, int $user_id, int $schedule_id, bool $pr
 }
 
 
-function getUserStats(int $tg_id): ?array {
+function getUserStats($tg_id): ?array {
     global $pdo;
     $user = getUserByTgId($tg_id);
     if (!$user) return null;
@@ -100,7 +100,7 @@ function getUserStats(int $tg_id): ?array {
 }
 
 
-function getScheduleForDate(int $tg_id, string $date, ?string $weekType = null, ?int $subgroup = null): array {
+function getScheduleForDate($tg_id, string $date, ?string $weekType = null, ?int $subgroup = null): array {
     global $pdo;
     $dayName = date('l', strtotime($date)); 
 
@@ -126,7 +126,7 @@ function getScheduleForDate(int $tg_id, string $date, ?string $weekType = null, 
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
-        ':tg_id'     => $tg_id,
+        ':tg_id'     => (string)$tg_id,
         ':dayName'   => $dayName,
         ':weekType'  => $weekType,
         ':subgroup'  => $subgroup
@@ -136,7 +136,7 @@ function getScheduleForDate(int $tg_id, string $date, ?string $weekType = null, 
 }
 
 
-function getWeekSchedule(int $tg_id, ?string $weekType = null, ?int $subgroup = null): array {
+function getWeekSchedule($tg_id, ?string $weekType = null, ?int $subgroup = null): array {
     global $pdo;
 
     $sql = "
@@ -161,7 +161,7 @@ function getWeekSchedule(int $tg_id, ?string $weekType = null, ?int $subgroup = 
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute([
-        ':tg_id'     => $tg_id,
+        ':tg_id'     => (string)$tg_id,
         ':weekType'  => $weekType,
         ':subgroup'  => $subgroup
     ]);
