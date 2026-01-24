@@ -1,7 +1,12 @@
 <?php
-require_once __DIR__.'/../config.php';require_once __DIR__.'/../db.php';
-if(!isset($_GET['tg_id']))die('Missing tg_id');$tg_id=intval($_GET['tg_id']);$user=getUserByTgId($tg_id);if(!$user)die('Unknown user');$user_id=$user['id'];
-$backUrl='greeting.php?tg_id='.$tg_id;if(isset($_GET['return'],$_GET['monitor_id'],$_GET['group_id'])&&$_GET['return']==='group'){$backUrl='view_group_attendance.php'.'?tg_id='.intval($_GET['monitor_id']).'&group_id='.intval($_GET['group_id']);}
+require_once __DIR__.'/config.php';require_once __DIR__.'/db.php';
+if(!isset($_GET['tg_id']))die('Missing tg_id');
+$tg_id=preg_replace('/\D/','',(string)($_GET['tg_id']??''));$user=getUserByTgId($tg_id);if(!$user)die('Unknown user');$user_id=$user['id'];
+$backUrl='greeting.php?tg_id='.rawurlencode($tg_id);
+if(isset($_GET['return'],$_GET['monitor_id'],$_GET['group_id'])&&$_GET['return']==='group'){
+  $monitor=preg_replace('/\D/','',(string)($_GET['monitor_id']??''));$gid=(int)($_GET['group_id']??0);
+  $backUrl='view_group_attendance.php'.'?tg_id='.rawurlencode($monitor).'&group_id='.$gid;
+}
 $today=date('Y-m-d');$weekStart=date('Y-m-d',strtotime('monday this week'));$monthStart=date('Y-m-01');
 function fetchStats($pdo,$uid,$from,$to=null){$params=[':uid'=>$uid,':from'=>$from];$cond="a.date >= :from";if($to!==null){$cond.=" AND a.date <= :to";$params[':to']=$to;}$totalQ=$pdo->prepare("SELECT COUNT(*) FROM attendance a WHERE a.user_id=:uid AND $cond");$totalQ->execute($params);$total=(int)$totalQ->fetchColumn();$absQ=$pdo->prepare("SELECT COUNT(*) FROM attendance a WHERE a.user_id=:uid AND $cond AND a.present=0");$absQ->execute($params);$absent=(int)$absQ->fetchColumn();$motQ=$pdo->prepare("SELECT COUNT(*) FROM attendance a WHERE a.user_id=:uid AND $cond AND a.present=0 AND a.motivated=1");$motQ->execute($params);$motiv=(int)$motQ->fetchColumn();$lstQ=$pdo->prepare("SELECT a.date,s.time_slot,s.subject,s.type,a.motivation FROM attendance a JOIN schedule s ON s.id=a.schedule_id WHERE a.user_id=:uid AND $cond AND a.present=0 ORDER BY a.date DESC,s.time_slot");$lstQ->execute($params);$rows=$lstQ->fetchAll(PDO::FETCH_ASSOC);return['total'=>$total,'absent'=>$absent,'motivated'=>$motiv,'unmotiv'=>$absent-$motiv,'rows'=>$rows];}
 function countClassDays($pdo,$uid,$from,$to){$q=$pdo->prepare("SELECT COUNT(DISTINCT a.date) FROM attendance a WHERE a.user_id=:uid AND a.date BETWEEN :from AND :to AND a.present=1");$q->execute([':uid'=>$uid,':from'=>$from,':to'=>$to]);return(int)$q->fetchColumn();}

@@ -1,0 +1,3 @@
+<?php
+function computeSemesterAndWeek(DateTimeInterface $d):array{$tz=$d->getTimezone();$y=(int)$d->format('Y');$m=(int)$d->format('n');if($m>=9){$s=1;$a=new DateTime("$y-09-01",$tz);}elseif($m<2){$s=1;$a=new DateTime(($y-1)."-09-01",$tz);}else{$s=2;$a=new DateTime("$y-02-01",$tz);}((int)$a->format('N')>=6)?$a->modify('next monday'):$a->modify('monday this week');$dd=new DateTime($d->format('Y-m-d'),$tz);$w=max(1,intdiv((int)$a->diff($dd)->format('%r%a'),7)+1);return[$s,$a,$w,$w%2?'odd':'even'];}
+function getCurrentWeekType():string{[, , ,$t]=computeSemesterAndWeek(new DateTime('today',new DateTimeZone('Europe/Chisinau')));return$t;}

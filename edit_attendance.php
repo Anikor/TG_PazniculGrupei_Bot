@@ -1,12 +1,12 @@
 <?php
-require_once __DIR__.'/../config.php';require_once __DIR__.'/../db.php';require_once __DIR__.'/oe_weeks.php';require_once __DIR__.'/time_restrict.php';
-function proxyTgIdForGroup(PDO $pdo,int $group_id):?int{try{$q=$pdo->prepare("SELECT tg_id FROM users WHERE group_id=? ORDER BY (role='student') DESC, id ASC LIMIT 1");$q->execute([$group_id]);$tg=$q->fetchColumn();return $tg?(int)$tg:null;}catch(Throwable $e){return null;}}
+require_once __DIR__.'/config.php';require_once __DIR__.'/db.php';require_once __DIR__.'/oe_weeks.php';require_once __DIR__.'/time_restrict.php';
+function proxyTgIdForGroup(PDO $pdo,int $group_id):?string{try{$q=$pdo->prepare("SELECT tg_id FROM users WHERE group_id=? ORDER BY (role='student') DESC, id ASC LIMIT 1");$q->execute([$group_id]);$tg=$q->fetchColumn();return $tg?(string)$tg:null;}catch(Throwable $e){return null;}}
 header('Access-Control-Allow-Origin: *');header('Access-Control-Allow-Headers: Content-Type');header('Access-Control-Allow-Methods: GET, POST, OPTIONS');if($_SERVER['REQUEST_METHOD']==='OPTIONS')exit;
-$tg_id=intval($_GET['tg_id']??0);$user=getUserByTgId($tg_id)?:exit('Invalid user');if(!in_array($user['role'],['admin','monitor','moderator'],true)){http_response_code(403);exit('Access denied');}
-$actor_tg=(int)($_GET['actor_tg']??0);$actor=$actor_tg?getUserByTgId($actor_tg):null;$editorId=$actor['id']??$user['id'];
+$tg_id=preg_replace('/\D/','',(string)($_GET['tg_id']??''));$user=getUserByTgId($tg_id)?:exit('Invalid user');if(!in_array($user['role'],['admin','monitor','moderator'],true)){http_response_code(403);exit('Access denied');}
+$actor_tg=preg_replace('/\D/','',(string)($_GET['actor_tg']??''));$actor=$actor_tg?getUserByTgId($actor_tg):null;$editorId=$actor['id']??$user['id'];
 $requested_group_id=(int)($_GET['group_id']??0);$effective_group_id=$requested_group_id>0?$requested_group_id:(int)$user['group_id'];
 $stmt=$pdo->prepare("SELECT name FROM `groups` WHERE id=?");$stmt->execute([$effective_group_id]);$grp=$stmt->fetch(PDO::FETCH_ASSOC);$groupName=$grp['name']??'Group '.$effective_group_id;
-$offset=intval($_GET['offset']??0);$date=date('Y-m-d',strtotime(($offset>=0?'+':'').$offset.' days'));$dayLabel=match(true){$offset===0=>'Today',$offset===-1=>'Yesterday',default=>($offset<0?abs($offset).' days ago':'+'.$offset.' days')};
+$offset=(int)($_GET['offset']??0);$date=date('Y-m-d',strtotime(($offset>=0?'+':'').$offset.' days'));$dayLabel=match(true){$offset===0=>'Today',$offset===-1=>'Yesterday',default=>($offset<0?abs($offset).' days ago':'+'.$offset.' days')};
 $tz=new DateTimeZone('Europe/Chisinau');$dt=new DateTime($date,$tz);[, , ,$weekType]=computeSemesterAndWeek($dt);
 if($requested_group_id>0){$proxy_tg=proxyTgIdForGroup($pdo,$effective_group_id)??$tg_id;$schedule=getScheduleForDate($proxy_tg,$date,$weekType);}else{$schedule=getScheduleForDate($tg_id,$date,$weekType);}
 [$canEdit,$lockReason]=can_user_edit_for_date($actor['role']??$user['role']??'',new DateTimeImmutable($date,$tz),$tz,$schedule);$editingLocked=!$canEdit;

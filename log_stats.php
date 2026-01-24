@@ -2,8 +2,8 @@
 // miniapp/log_stats.php — clean dashboard (no CSV), filters on their own line,
 // dark slider inline with Back, group auto-apply handled by script.js
 
-require_once __DIR__ . '/../config.php';
-require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/db.php';
 
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Headers: Content-Type');
