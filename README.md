@@ -358,7 +358,7 @@ tunnel: attendance-bot
 credentials-file: /home/pi/.cloudflared/attendance-bot.json
 
 ingress:
-  - hostname: pi.example.com
+  - hostname: domain-example.com
     service: http://localhost
   - service: http_status:404
 ```
@@ -390,7 +390,7 @@ https://domain-example.com/greeting.php
 
 ---
 
-## Hosting Option 2: Local PC with ngrok (Development Only)
+## Hosting Option 2: Local PC with Ngrok (Old miniapp version, see releases)
 
 <details>
 <summary>Click to expand (skip if you've already done this)</summary>
