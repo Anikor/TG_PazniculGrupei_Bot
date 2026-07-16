@@ -2,9 +2,11 @@
 ob_start();
 require_once __DIR__.'/config.php';
 require_once __DIR__.'/db.php';
+require_once __DIR__.'/oe_weeks.php';
 
-$month = intval(date('n'));
-$currentSemester = ($month >= 9 || $month === 1) ? 1 : 2;
+// Semester from the one shared implementation instead of a private
+// re-derivation that could drift from oe_weeks.php.
+[$currentSemester] = computeSemesterAndWeek(new DateTime('today', new DateTimeZone(APP_TZ)));
 
 require_once __DIR__.'/tg_auth.php';
 $user = tg_require_auth();

@@ -188,6 +188,7 @@ Example: `group_241_attendance_month_01.08.2025`
 ```
 ├── config.php                          # Database & app configuration (env-based)
 ├── db.php                              # Database functions & queries
+├── helpers.php                         # Shared utilities (proxy tg_id, subject abbreviations, subgroup rules)
 ├── tg_auth.php                         # Telegram initData validation, session & permission checks
 ├── index.php                           # Main attendance logging page
 ├── edit_attendance.php                 # Edit historical attendance records
@@ -236,9 +237,9 @@ Example: `group_241_attendance_month_01.08.2025`
      ```ini
      BOT_TOKEN=your-telegram-bot-token
      APP_HOST=https://your-domain-or-tunnel.com
-     SECRET_TOKEN=some-random-secret
      DB_HOST=127.0.0.1
-     DB_NAME=attendance_utm
+     # Must match the name created by init_db.sql (yes, that spelling):
+     DB_NAME=attendence_utm
      DB_USER=DBuser
      DB_PASS=your-db-password
      ```
@@ -292,6 +293,10 @@ server {
     location ~ /\.ht {
         deny all;
     }
+
+    # Never serve repo metadata / schema / docs from the webroot.
+    location ~ /\.(git|env) { deny all; }
+    location ~* \.(sql|md|sh)$ { deny all; }
 }
 EOF
 
@@ -312,10 +317,10 @@ sudo chown -R www-data:www-data .
 ### 4. Initialize Database
 
 ```bash
-sudo mysql -u root -p < migration_slotid_time_slots.sql
+sudo mysql -u root -p < init_db.sql
 # Create database user if not exists:
 # CREATE USER 'DBuser'@'localhost' IDENTIFIED BY 'your-db-password';
-# GRANT ALL PRIVILEGES ON attendance_utm.* TO 'DBuser'@'localhost';
+# GRANT ALL PRIVILEGES ON attendence_utm.* TO 'DBuser'@'localhost';
 ```
 
 ### 5. Create Configuration File
@@ -324,9 +329,8 @@ sudo mysql -u root -p < migration_slotid_time_slots.sql
 sudo tee /etc/attendance-bot.env > /dev/null << 'EOF'
 BOT_TOKEN=your-bot-token-here
 APP_HOST=https://domain-example.com
-SECRET_TOKEN=your-secret-token-here
 DB_HOST=127.0.0.1
-DB_NAME=attendance_utm
+DB_NAME=attendence_utm
 DB_USER=DBuser
 DB_PASS=your-db-password
 EOF
@@ -455,11 +459,16 @@ View live HTTP logs at: http://127.0.0.1:4040/inspect/http
 |----------|-------------|---------|
 | `APP_HOST` | Public URL of your app | `https://domain-example.com` |
 | `BOT_TOKEN` | Telegram Bot API token | `123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11` |
-| `SECRET_TOKEN` | Secret for request validation | `your-random-secret-key` |
 | `DB_HOST` | MySQL host | `127.0.0.1` |
-| `DB_NAME` | Database name | `attendance_utm` |
+| `DB_NAME` | Database name (must match `init_db.sql`) | `attendence_utm` |
 | `DB_USER` | Database user | `DBuser` |
 | `DB_PASS` | Database password | `your-secure-password` |
+| `APP_TZ` | App timezone (all dates/locks) | `Europe/Chisinau` |
+| `PRIMARY_GROUP_NAME` | Group behind the admin "Primary" button | `R-241` |
+| `SECONDARY_TG_ID` | tg_id behind the admin "Secondary" button (0 hides it) | `123456789` |
+| `LAB_FEE_LEI` | Estimated fee per missed lab | `50` |
+| `MODERATOR_GRACE_MIN` | Moderator window after last lesson, minutes | `20` |
+| `MODERATOR_FALLBACK_CUTOFF` | Moderator cutoff when the day has no lessons | `18:00` |
 
 ---
 
@@ -482,7 +491,7 @@ View live HTTP logs at: http://127.0.0.1:4040/inspect/http
 ### Database connection error
 - Ensure MySQL is running: `sudo systemctl status mysql`
 - Verify credentials in `/etc/attendance-bot.env`.
-- Test connection: `mysql -u DBuser -p -h 127.0.0.1 attendance_utm`
+- Test connection: `mysql -u DBuser -p -h 127.0.0.1 attendence_utm`
 
 ### Mini App not loading
 - If `Invalid user/Telegram ID` check the DB table `users` for wrong `tg_id` or `role`.

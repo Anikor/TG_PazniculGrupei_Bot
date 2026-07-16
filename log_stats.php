@@ -22,7 +22,7 @@ $period = $_GET['period'] ?? 'w';
 $period = in_array($period, ['w','m','a'], true) ? $period : 'w';
 
 // Date ranges
-$tz = new DateTimeZone('Europe/Chisinau');
+$tz = new DateTimeZone(APP_TZ);
 $today     = new DateTimeImmutable('today', $tz);
 $weekStart = new DateTimeImmutable('monday this week', $tz);
 $monthStart= $today->modify('first day of this month');

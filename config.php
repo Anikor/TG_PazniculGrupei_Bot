@@ -7,9 +7,20 @@ $ENV = is_readable('/etc/attendance-bot.env')
 
 function env($k,$d=null){global $ENV; if(array_key_exists($k,$ENV)&&$ENV[$k]!=='')return $ENV[$k]; $v=getenv($k); return ($v===false||$v==='')?$d:$v;}
 
+// All date()/strtotime() calls follow this. Without it, "today" comes from the
+// server's TZ while the lock logic uses Europe/Chisinau explicitly — around
+// midnight those disagree and attendance lands on the wrong day.
+define('APP_TZ', env('APP_TZ', 'Europe/Chisinau'));
+date_default_timezone_set(APP_TZ);
+
 define('APP_HOST', env('APP_HOST','https://pi.anikor.eu'));
-define('SECRET_TOKEN', env('SECRET_TOKEN', ''));
 define('SECONDARY_TG_ID', (int)env('SECONDARY_TG_ID', 0)); // admin "Secondary" shortcut; 0 hides the button
+
+// Business values that used to be hardcoded in page files.
+define('PRIMARY_GROUP_NAME', env('PRIMARY_GROUP_NAME', 'R-241')); // admin "Primary" view shortcut
+define('LAB_FEE_LEI', (int)env('LAB_FEE_LEI', 50));               // estimated fee per missed lab
+define('MODERATOR_GRACE_MIN', (int)env('MODERATOR_GRACE_MIN', 20));          // minutes after last lesson
+define('MODERATOR_FALLBACK_CUTOFF', env('MODERATOR_FALLBACK_CUTOFF', '18:00')); // when no schedule that day
 define('BOT_TOKEN',env('BOT_TOKEN','')); if(BOT_TOKEN===''){error_log('FATAL: BOT_TOKEN missing');http_response_code(500);exit('Config error');}
 
 $DB_HOST = env('DB_HOST','127.0.0.1');
@@ -28,4 +39,3 @@ try {
   error_log('DB connect failed: '.$e->getMessage());
   http_response_code(500); exit('DB error');
 }
-define('API_URL', 'https://api.telegram.org/bot'.BOT_TOKEN.'/');
