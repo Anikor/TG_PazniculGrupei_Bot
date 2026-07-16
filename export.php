@@ -142,9 +142,8 @@ foreach ($data as $subj => $tbl) {
     sort($students, SORT_STRING);
 
     csv_row($out, ['Subject', csv_safe($subj)]);
-    $dateCells = array_map(fn($d) => "'" . date('d.m.Y', strtotime($d)), $isoDates);
-    csv_row($out, array_merge(['Date'], $dateCells));
-    csv_row($out, array_merge(['Student'], array_fill(0, count($isoDates), 'Present')));
+    $dateCells = array_map(fn($d) => date('d.m.Y', strtotime($d)), $isoDates);
+    csv_row($out, array_merge([''], $dateCells));
 
     foreach ($students as $stuName) {
         $row = [csv_safe($stuName)];
