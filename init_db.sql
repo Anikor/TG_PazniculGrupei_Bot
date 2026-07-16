@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS `attendance` (
   KEY `schedule_id` (`schedule_id`),
   KEY `marked_by` (`marked_by`),
   KEY `attendance_updated_by_fk` (`updated_by`),
+  -- Only takes effect on a fresh install. The live production table
+  -- already exists and needs these applied via ALTER TABLE instead --
+  -- see OPTIMIZATION.md sec 4 for that migration and the duplicate-row
+  -- check uq_attendance requires first.
+  KEY `idx_user_date` (`user_id`, `date`),
+  UNIQUE KEY `uq_attendance` (`user_id`, `schedule_id`, `date`),
   CONSTRAINT `attendance_ibfk_1`
     FOREIGN KEY (`user_id`)     REFERENCES `users`    (`id`),
   CONSTRAINT `attendance_ibfk_2`
