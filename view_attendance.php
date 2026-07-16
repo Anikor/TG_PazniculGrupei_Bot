@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__.'/config.php';require_once __DIR__.'/db.php';
-if(!isset($_GET['tg_id']))die('Missing tg_id');
-$tg_id=preg_replace('/\D/','',(string)($_GET['tg_id']??''));$user=getUserByTgId($tg_id);if(!$user)die('Unknown user');$user_id=$user['id'];
+require_once __DIR__.'/tg_auth.php';$me=tg_require_auth();$target=$me;if(!empty($_GET['tg_id'])){$t=getUserByTgId(preg_replace('/\D/','',(string)$_GET['tg_id']));if($t)$target=$t;}if(!tg_can_view_user($me,$target))tg_deny('Not allowed to view this student');$user=$target;$user_id=(int)$target['id'];$tg_id=(string)$target['tg_id'];
 $backUrl='greeting.php?tg_id='.rawurlencode($tg_id);
 if(isset($_GET['return'],$_GET['monitor_id'],$_GET['group_id'])&&$_GET['return']==='group'){
   $monitor=preg_replace('/\D/','',(string)($_GET['monitor_id']??''));$gid=(int)($_GET['group_id']??0);

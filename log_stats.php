@@ -5,21 +5,17 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Headers: Content-Type');
-header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit;
+require_once __DIR__.'/tg_auth.php';
 
 // Who’s viewing?
-$tg_id = (int)($_GET['tg_id'] ?? 0);
-$user  = getUserByTgId($tg_id) ?: exit('Invalid user');
-if (!in_array($user['role'] ?? 'student', ['admin','monitor','moderator'], true)) {
-  http_response_code(403);
-  exit('Access denied');
-}
+$user = tg_require_auth();
+tg_require_role($user, ['admin','monitor','moderator']);
+$tg_id = (int)$user['tg_id'];
 
 // Group filter (0 = All)
-$selectedGroupId = (int)($_GET['group_id'] ?? ($user['group_id'] ?? 0));
+$selectedGroupId = (int)($_GET['group_id'] ?? 0);
+if ($selectedGroupId === 0 && $user['role'] !== 'admin') { $selectedGroupId = (int)$user['group_id']; }
+elseif ($selectedGroupId > 0) { $selectedGroupId = tg_resolve_group_id($user, $selectedGroupId); }
 
 // Period selector: w=Week, m=Month, a=All
 $period = $_GET['period'] ?? 'w';
