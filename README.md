@@ -200,9 +200,7 @@ Example: `group_241_attendance_month_01.08.2025`
 ├── log_stats.php                       # Statistics logging endpoint
 ├── export.php                          # Export attendance data
 ├── script.js                           # Frontend UI logic (minified)
-├── style.css                           # Main stylesheet
-├── tableb.css                          # Compact table layout
-├── tablec.css                          # Big table layout
+├── style.css                           # Single stylesheet (incl. compact/big schedule layouts, scoped to the greeting page)
 └── init_db.sql                         # SQL DB Structure example
 ```
 
