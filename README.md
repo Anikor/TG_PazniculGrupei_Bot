@@ -188,6 +188,7 @@ Example: `group_241_attendance_month_01.08.2025`
 ```
 ├── config.php                          # Database & app configuration (env-based)
 ├── db.php                              # Database functions & queries
+├── tg_auth.php                         # Telegram initData validation, session & permission checks
 ├── index.php                           # Main attendance logging page
 ├── edit_attendance.php                 # Edit historical attendance records
 ├── view_attendance.php                 # View individual attendance stats
