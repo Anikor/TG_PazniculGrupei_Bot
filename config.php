@@ -1,5 +1,5 @@
 <?php
-error_reporting(E_ALL); ini_set('log_errors','1');
+error_reporting(E_ALL); ini_set('log_errors','1'); ini_set('display_errors','0');
 
 $ENV = is_readable('/etc/attendance-bot.env')
   ? (parse_ini_file('/etc/attendance-bot.env', false, INI_SCANNER_TYPED) ?: [])
@@ -9,6 +9,7 @@ function env($k,$d=null){global $ENV; if(array_key_exists($k,$ENV)&&$ENV[$k]!=='
 
 define('APP_HOST', env('APP_HOST','https://pi.anikor.eu'));
 define('SECRET_TOKEN', env('SECRET_TOKEN', ''));
+define('SECONDARY_TG_ID', (int)env('SECONDARY_TG_ID', 0)); // admin "Secondary" shortcut; 0 hides the button
 define('BOT_TOKEN',env('BOT_TOKEN','')); if(BOT_TOKEN===''){error_log('FATAL: BOT_TOKEN missing');http_response_code(500);exit('Config error');}
 
 $DB_HOST = env('DB_HOST','127.0.0.1');
@@ -28,12 +29,3 @@ try {
   http_response_code(500); exit('DB error');
 }
 define('API_URL', 'https://api.telegram.org/bot'.BOT_TOKEN.'/');
-
-// === Telegram basics (appended) ===
-if (!defined('BOT_TOKEN')) {
-  $botTokenFromEnv = getenv('BOT_TOKEN') ?: '';
-  define('BOT_TOKEN', $botTokenFromEnv);
-}
-if (!defined('API_URL')) {
-  define('API_URL', 'https://api.telegram.org/bot'.BOT_TOKEN.'/');
-}
