@@ -4,6 +4,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/helpers.php';
 
 require_once __DIR__.'/tg_auth.php';
 
@@ -188,8 +189,8 @@ $themeLabel = ($theme==='dark') ? 'Dark' : 'Light';
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Log Statistics</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <link rel="stylesheet" href="<?= asset('style.css') ?>">
+  <script src="<?= asset('script.js') ?>" defer></script>
 
   <!-- Minimal helpers to force two rows + remove underline -->
 </head>

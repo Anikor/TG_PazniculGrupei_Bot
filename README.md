@@ -295,6 +295,13 @@ server {
     # Never serve repo metadata / schema / docs from the webroot.
     location ~ /\.(git|env) { deny all; }
     location ~* \.(sql|md|sh)$ { deny all; }
+
+    # CSS/JS are cache-busted by ?v=<filemtime>, so long client/CDN caching
+    # is safe — Cloudflare will serve these from the edge.
+    location ~* \.(css|js)$ {
+        expires 30d;
+        add_header Cache-Control "public";
+    }
 }
 EOF
 

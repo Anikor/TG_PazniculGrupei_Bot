@@ -69,7 +69,11 @@ CREATE TABLE IF NOT EXISTS `attendance` (
   `updated_by`  INT(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `user_id` (`user_id`),
-  KEY `schedule_id` (`schedule_id`),
+  -- Composite: index.php/edit_attendance.php load every page with
+  -- "WHERE date=? AND schedule_id IN (...)" — (schedule_id, date) makes that
+  -- covering. Its leftmost column also satisfies the schedule_id FK, so no
+  -- separate single-column key is needed.
+  KEY `idx_sched_date` (`schedule_id`, `date`),
   KEY `marked_by` (`marked_by`),
   KEY `attendance_updated_by_fk` (`updated_by`),
   -- Only takes effect on a fresh install. An existing production table
@@ -79,7 +83,9 @@ CREATE TABLE IF NOT EXISTS `attendance` (
   --   GROUP BY user_id, schedule_id, date HAVING c > 1;
   --   -- resolve duplicates, then:
   --   ALTER TABLE attendance ADD INDEX idx_user_date (user_id, date),
-  --     ADD UNIQUE KEY uq_attendance (user_id, schedule_id, date);
+  --     ADD UNIQUE KEY uq_attendance (user_id, schedule_id, date),
+  --     ADD INDEX idx_sched_date (schedule_id, date),
+  --     DROP INDEX schedule_id;  -- superseded by idx_sched_date's prefix
   KEY `idx_user_date` (`user_id`, `date`),
   UNIQUE KEY `uq_attendance` (`user_id`, `schedule_id`, `date`),
   CONSTRAINT `attendance_ibfk_1`

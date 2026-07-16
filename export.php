@@ -2,6 +2,7 @@
 ob_start();
 require_once __DIR__.'/config.php';
 require_once __DIR__.'/db.php';
+require_once __DIR__.'/helpers.php';
 require_once __DIR__.'/oe_weeks.php';
 
 // Semester from the one shared implementation instead of a private
@@ -28,7 +29,7 @@ function render_page(string $title, array $links, int $tg_id, int $group_id): vo
     $theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
     $themeClass = ($theme === 'dark') ? 'dark-theme' : '';
     $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
-    ?><!DOCTYPE html><html lang="en" class="<?=$themeClass?>"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=htmlspecialchars($title)?></title><script src="script.js"></script><link rel="stylesheet" href="style.css"></head><body><div id="theme-switch"><label class="switch"><input type="checkbox" id="theme-toggle" <?=$theme==='dark'?'checked':''?>><span class="slider"></span></label><span id="theme-label"><?=$themeLabel?></span></div><br><br><button class="btn btn-ghost btn-nav" onclick="location.href='greeting.php?tg_id=<?=(int)$tg_id?>'">← Back to Schedule</button><h2><?=htmlspecialchars($title)?></h2><div class="actions"><?php foreach($links as $link):?><a class="btn btn-primary" href="<?=htmlspecialchars($link['url'])?>"><?=htmlspecialchars($link['label'])?></a><?php endforeach?></div></body></html><?php
+    ?><!DOCTYPE html><html lang="en" class="<?=$themeClass?>"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=htmlspecialchars($title)?></title><script src="<?= asset('script.js') ?>"></script><link rel="stylesheet" href="<?= asset('style.css') ?>"></head><body><div id="theme-switch"><label class="switch"><input type="checkbox" id="theme-toggle" <?=$theme==='dark'?'checked':''?>><span class="slider"></span></label><span id="theme-label"><?=$themeLabel?></span></div><br><br><button class="btn btn-ghost btn-nav" onclick="location.href='greeting.php?tg_id=<?=(int)$tg_id?>'">← Back to Schedule</button><h2><?=htmlspecialchars($title)?></h2><div class="actions"><?php foreach($links as $link):?><a class="btn btn-primary" href="<?=htmlspecialchars($link['url'])?>"><?=htmlspecialchars($link['label'])?></a><?php endforeach?></div></body></html><?php
     exit;
 }
 

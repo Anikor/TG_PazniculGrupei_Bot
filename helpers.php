@@ -42,6 +42,17 @@ function subject_abbr(string $s): string
     return mb_substr($o, 0, 6);
 }
 
+/**
+ * Cache-busted asset URL: style.css → style.css?v=<mtime>. Telegram's webview
+ * then re-downloads a file only when it actually changed, instead of relying
+ * on hand-bumped ?v=1 / ?v=nav-global-5 strings that are easy to forget.
+ */
+function asset(string $file): string
+{
+    $p = __DIR__ . '/' . $file;
+    return $file . '?v=' . (is_file($p) ? filemtime($p) : time());
+}
+
 /** "(sg 1)" tag for schedule headers when a lesson targets one subgroup. */
 function subgroup_tag($subgroup): string
 {
