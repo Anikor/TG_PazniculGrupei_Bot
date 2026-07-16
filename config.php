@@ -14,7 +14,10 @@ define('APP_TZ', env('APP_TZ', 'Europe/Chisinau'));
 date_default_timezone_set(APP_TZ);
 
 define('APP_HOST', env('APP_HOST','https://pi.anikor.eu'));
-define('SECONDARY_TG_ID', (int)env('SECONDARY_TG_ID', 0)); // admin "Secondary" shortcut; 0 hides the button
+// String, not int: Telegram IDs exceed 2^31 and would clamp on 32-bit
+// (armhf) PHP builds. Empty/'0' hides the admin "Secondary" button.
+define('SECONDARY_TG_ID', preg_replace('/\D/', '', (string)env('SECONDARY_TG_ID', '')));
+define('SESSION_MAX_AGE_DAYS', (int)env('SESSION_MAX_AGE_DAYS', 7)); // re-auth is silent via initData
 
 // Business values that used to be hardcoded in page files.
 define('PRIMARY_GROUP_NAME', env('PRIMARY_GROUP_NAME', 'R-241')); // admin "Primary" view shortcut

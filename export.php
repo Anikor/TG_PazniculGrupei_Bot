@@ -12,7 +12,6 @@ require_once __DIR__.'/oe_weeks.php';
 require_once __DIR__.'/tg_auth.php';
 $user = tg_require_auth();
 tg_require_role($user, ['admin', 'monitor', 'moderator']);
-$tg_id    = (int)$user['tg_id'];
 $group_id = tg_resolve_group_id($user, $_GET['group_id'] ?? 0);
 $action   = $_GET['action'] ?? '';
 
@@ -25,23 +24,23 @@ function csv_row($out, array $fields): void {
     fputcsv($out, $fields, ';', '"', '\\');
 }
 
-function render_page(string $title, array $links, int $tg_id, int $group_id): void {
+function render_page(string $title, array $links, int $group_id): void {
     $theme = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
     $themeClass = ($theme === 'dark') ? 'dark-theme' : '';
     $themeLabel = ($theme === 'dark') ? 'Dark' : 'Light';
-    ?><!DOCTYPE html><html lang="en" class="<?=$themeClass?>"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=htmlspecialchars($title)?></title><script src="<?= asset('script.js') ?>"></script><link rel="stylesheet" href="<?= asset('style.css') ?>"></head><body><div id="theme-switch"><label class="switch"><input type="checkbox" id="theme-toggle" <?=$theme==='dark'?'checked':''?>><span class="slider"></span></label><span id="theme-label"><?=$themeLabel?></span></div><br><br><button class="btn btn-ghost btn-nav" onclick="location.href='greeting.php?tg_id=<?=(int)$tg_id?>'">← Back to Schedule</button><h2><?=htmlspecialchars($title)?></h2><div class="actions"><?php foreach($links as $link):?><a class="btn btn-primary" href="<?=htmlspecialchars($link['url'])?>"><?=htmlspecialchars($link['label'])?></a><?php endforeach?></div></body></html><?php
+    ?><!DOCTYPE html><html lang="en" class="<?=$themeClass?>"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title><?=htmlspecialchars($title)?></title><script src="<?= asset('script.js') ?>"></script><link rel="stylesheet" href="<?= asset('style.css') ?>"></head><body><div id="theme-switch"><label class="switch"><input type="checkbox" id="theme-toggle" <?=$theme==='dark'?'checked':''?>><span class="slider"></span></label><span id="theme-label"><?=$themeLabel?></span></div><br><br><button class="btn btn-ghost btn-nav" onclick="location.href='greeting.php'">← Back to Schedule</button><h2><?=htmlspecialchars($title)?></h2><div class="actions"><?php foreach($links as $link):?><a class="btn btn-primary" href="<?=htmlspecialchars($link['url'])?>"><?=htmlspecialchars($link['label'])?></a><?php endforeach?></div></body></html><?php
     exit;
 }
 
 if ($action === '') {
     $opts = [
-        ['label'=>'This Week',  'url'=>"?tg_id={$tg_id}&action=week&group_id={$group_id}"],
-        ['label'=>'This Month', 'url'=>"?tg_id={$tg_id}&action=month&group_id={$group_id}"],
-        ['label'=>'All Time',   'url'=>"?tg_id={$tg_id}&action=all&group_id={$group_id}"],
-        ['label'=>'By Subject', 'url'=>"?tg_id={$tg_id}&action=subject&group_id={$group_id}"],
-        ['label'=>'By Student', 'url'=>"?tg_id={$tg_id}&action=student&group_id={$group_id}"],
+        ['label'=>'This Week',  'url'=>"?action=week&group_id={$group_id}"],
+        ['label'=>'This Month', 'url'=>"?action=month&group_id={$group_id}"],
+        ['label'=>'All Time',   'url'=>"?action=all&group_id={$group_id}"],
+        ['label'=>'By Subject', 'url'=>"?action=subject&group_id={$group_id}"],
+        ['label'=>'By Student', 'url'=>"?action=student&group_id={$group_id}"],
     ];
-    render_page('Export Options', $opts, $tg_id, $group_id);
+    render_page('Export Options', $opts, $group_id);
 }
 
 if ($action === 'subject' && !isset($_GET['subject'])) {
@@ -49,9 +48,9 @@ if ($action === 'subject' && !isset($_GET['subject'])) {
     $sSt->execute([$group_id]);
     $links = [];
     while ($s = $sSt->fetchColumn()) {
-        $links[] = ['label'=>$s, 'url'=>"?tg_id={$tg_id}&action=subject&subject=".urlencode($s)."&group_id={$group_id}"];
+        $links[] = ['label'=>$s, 'url'=>"?action=subject&subject=".urlencode($s)."&group_id={$group_id}"];
     }
-    render_page('Select Subject', $links, $tg_id, $group_id);
+    render_page('Select Subject', $links, $group_id);
 }
 
 if ($action === 'student' && !isset($_GET['student_id'])) {
@@ -59,9 +58,9 @@ if ($action === 'student' && !isset($_GET['student_id'])) {
     $uSt->execute([$group_id]);
     $links = [];
     while ($stu = $uSt->fetch(PDO::FETCH_ASSOC)) {
-        $links[] = ['label'=>$stu['name'], 'url'=>"?tg_id={$tg_id}&action=student&student_id={$stu['id']}&group_id={$group_id}"];
+        $links[] = ['label'=>$stu['name'], 'url'=>"?action=student&student_id={$stu['id']}&group_id={$group_id}"];
     }
-    render_page('Select Student', $links, $tg_id, $group_id);
+    render_page('Select Student', $links, $group_id);
 }
 
 $stmt = $pdo->prepare("SELECT name FROM `groups` WHERE id = ?");

@@ -1,0 +1,20 @@
+name: lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # php and node are preinstalled on ubuntu-latest runners.
+      - name: PHP syntax check
+        run: |
+          set -e
+          for f in *.php; do php -l "$f"; done
+
+      - name: JS syntax check
+        run: node --check script.js

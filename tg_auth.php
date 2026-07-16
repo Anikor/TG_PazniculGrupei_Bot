@@ -72,8 +72,11 @@ function tg_parse_qs(string $qs): array
         if ($eq === false) {
             continue;
         }
-        $k = urldecode(substr($pair, 0, $eq));
-        $v = urldecode(substr($pair, $eq + 1));
+        // rawurldecode, NOT urldecode: urldecode turns a literal '+' into a
+        // space, which would corrupt the data-check-string and permanently
+        // fail login for any user whose initData carries a raw '+'.
+        $k = rawurldecode(substr($pair, 0, $eq));
+        $v = rawurldecode(substr($pair, $eq + 1));
         $out[$k] = $v;
     }
     return $out;
@@ -131,7 +134,11 @@ function tg_validate_init_data(string $initData, string $botToken, int $maxAgeSe
         return null;
     }
 
-    $user = json_decode((string)($fields['user'] ?? ''), true);
+    // JSON_BIGINT_AS_STRING: Telegram IDs exceed 2^31. On 32-bit PHP
+    // (armhf Raspberry Pi OS) json_decode would otherwise return them as
+    // floats — "9.87654321E+9" fails ctype_digit and login breaks for
+    // every user with a modern ID. As a string the ID survives intact.
+    $user = json_decode((string)($fields['user'] ?? ''), true, 512, JSON_BIGINT_AS_STRING);
     if (!is_array($user) || !isset($user['id']) || !ctype_digit((string)$user['id'])) {
         return null;
     }
@@ -178,7 +185,7 @@ function tg_handle_bootstrap(): void
 
     tg_session_start();
     session_regenerate_id(true); // prevent session fixation
-    $_SESSION['tg_id']   = (int)$user['id'];
+    $_SESSION['tg_id']   = (string)$user['id']; // string: 32-bit-safe
     $_SESSION['auth_at'] = time();
 
     echo json_encode(['success' => true]);
@@ -202,6 +209,14 @@ function tg_current_user(): ?array
     }
 
     tg_session_start();
+
+    // Sessions expire: auth_at was stored but never checked. Expiry is
+    // painless — the greeting bootstrap silently re-validates initData.
+    $maxAge = (defined('SESSION_MAX_AGE_DAYS') ? (int)SESSION_MAX_AGE_DAYS : 7) * 86400;
+    if (!empty($_SESSION['tg_id']) && (time() - (int)($_SESSION['auth_at'] ?? 0)) > $maxAge) {
+        $_SESSION = [];
+        session_regenerate_id(true);
+    }
 
     if (!empty($_SESSION['tg_id'])) {
         return $cached = getUserByTgId((string)$_SESSION['tg_id']);

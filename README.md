@@ -470,7 +470,8 @@ View live HTTP logs at: http://127.0.0.1:4040/inspect/http
 | `DB_PASS` | Database password | `your-secure-password` |
 | `APP_TZ` | App timezone (all dates/locks) | `Europe/Chisinau` |
 | `PRIMARY_GROUP_NAME` | Group behind the admin "Primary" button | `R-241` |
-| `SECONDARY_TG_ID` | tg_id behind the admin "Secondary" button (0 hides it) | `123456789` |
+| `SECONDARY_TG_ID` | tg_id behind the admin "Secondary" button (empty hides it) | `123456789` |
+| `SESSION_MAX_AGE_DAYS` | Session lifetime; re-auth is silent via Telegram initData | `7` |
 | `LAB_FEE_LEI` | Estimated fee per missed lab | `50` |
 | `MODERATOR_GRACE_MIN` | Moderator window after last lesson, minutes | `20` |
 | `MODERATOR_FALLBACK_CUTOFF` | Moderator cutoff when the day has no lessons | `18:00` |

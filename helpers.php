@@ -29,17 +29,22 @@ function proxyTgIdForGroup(PDO $pdo, int $group_id): ?string
     }
 }
 
-/** Short subject abbreviation for narrow screens: "Analiza matematică" → "AM". */
+/**
+ * Short subject abbreviation for narrow screens: "Analiza matematică" → "AM".
+ * Absorbed greeting.php's near-identical initials(): stopword lists merged,
+ * plus its first-letter fallback for strings that are all stopwords.
+ */
 function subject_abbr(string $s): string
 {
-    $stop = ['si','și','şi','pe','de','la','cu','in','în','din','a','al','ale','un','o','lui','ai'];
+    $stop = ['si','și','şi','pe','de','la','cu','in','în','din','a','al','ale','un','o','lui','ai','of','and','the'];
     $w = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($s));
     $o = '';
     foreach ($w as $x) {
         if ($x === '' || in_array($x, $stop, true)) continue;
         $o .= mb_strtoupper(mb_substr($x, 0, 1));
     }
-    return mb_substr($o, 0, 6);
+    $o = mb_substr($o, 0, 6);
+    return $o !== '' ? $o : mb_strtoupper(mb_substr(trim($s), 0, 1));
 }
 
 /**

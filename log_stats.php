@@ -11,7 +11,6 @@ require_once __DIR__.'/tg_auth.php';
 // Who’s viewing?
 $user = tg_require_auth();
 tg_require_role($user, ['admin','monitor','moderator']);
-$tg_id = (int)$user['tg_id'];
 
 // Group filter (0 = All)
 $selectedGroupId = (int)($_GET['group_id'] ?? 0);
@@ -201,7 +200,7 @@ $themeLabel = ($theme==='dark') ? 'Dark' : 'Light';
   <div class="topbar-stack">
     <!-- Row 1 -->
     <div class="topbar-row">
-      <a class="btn-nav no-underline" href="greeting.php?tg_id=<?= (int)$tg_id ?>&when=today">← Back to Schedule</a>
+      <a class="btn-nav no-underline" href="greeting.php?when=today">← Back to Schedule</a>
 
       <div id="theme-switch" class="inline-switch">
         <label class="switch">
@@ -214,8 +213,6 @@ $themeLabel = ($theme==='dark') ? 'Dark' : 'Light';
 <br>
     <!-- Row 2 (always on a new line) -->
     <form method="get" class="topbar-row filters" id="stats-filters">
-      <input type="hidden" name="tg_id" value="<?= (int)$tg_id ?>">
-
       <label class="select">
         Group:
         <select name="group_id" id="group-select">
@@ -230,7 +227,7 @@ $themeLabel = ($theme==='dark') ? 'Dark' : 'Light';
 
       <div class="segmented">
         <br>
-        <?php $base = 'log_stats.php?tg_id='.$tg_id.'&group_id='.$selectedGroupId.'&period='; ?>
+        <?php $base = 'log_stats.php?group_id='.$selectedGroupId.'&period='; ?>
         <a class="<?= $period==='w'?'active':'' ?>" href="<?= $base ?>w">Week</a>
         <a class="<?= $period==='m'?'active':'' ?>" href="<?= $base ?>m">Month</a>
         <a class="<?= $period==='a'?'active':'' ?>" href="<?= $base ?>a">All</a>
