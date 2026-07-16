@@ -1,7 +1,6 @@
 <?php
 require_once __DIR__.'/config.php';require_once __DIR__.'/db.php';
-$tg_id=preg_replace('/\D/','',(string)($_GET['tg_id']??'0'));$me=getUserByTgId($tg_id)?:die('Unknown user');if(!in_array($me['role'],['admin','monitor'],true)){die('Access denied');}
-$group_id=intval($_GET['group_id']?? $me['group_id']);
+require_once __DIR__.'/tg_auth.php';$me=tg_require_auth();tg_require_role($me,['admin','monitor']);$tg_id=(string)$me['tg_id'];$group_id=tg_resolve_group_id($me,$_GET['group_id']??0);
 $today=date('Y-m-d');$weekStart=date('Y-m-d',strtotime('monday this week'));$monthStart=date('Y-m-01');
 $periods=['Today'=>[$today,$today],'This Week'=>[$weekStart,$today],'This Month'=>[$monthStart,$today],'All Time'=>['1970-01-01',$today],];
 function fetchStats(PDO $pdo,$uid,$from,$to=null){$params=[':uid'=>$uid,':from'=>$from];$cond="a.date >= :from";if($to!==null){$cond.=" AND a.date <= :to";$params[':to']=$to;}$qTot=$pdo->prepare("SELECT COUNT(*) FROM attendance a WHERE a.user_id=:uid AND $cond");$qTot->execute($params);$total=(int)$qTot->fetchColumn();$qAbs=$pdo->prepare("SELECT COUNT(*) FROM attendance a WHERE a.user_id=:uid AND $cond AND a.present=0");$qAbs->execute($params);$absent=(int)$qAbs->fetchColumn();return[$total,$absent];}

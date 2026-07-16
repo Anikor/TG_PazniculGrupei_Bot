@@ -1,8 +1,18 @@
 -- 1) Create database
-CREATE DATABASE IF NOT EXISTS `attandance_utm`
+--
+-- Verified against a real mysqldump of the production Pi database
+-- (attendence_utm_2026-02-14_120125.sql.gz) on 2026-07-16: every table
+-- below matches column-for-column. The one thing that did NOT match was
+-- this database name — it previously read `attandance_utm`, a third,
+-- different misspelling from config.php's default (`attendence_utm`, see
+-- the dump's own header) and from README.md's (`attendance_utm`). A fresh
+-- install following the old file could never actually connect. This name
+-- must match config.php's DB_NAME default (or your /etc/attendance-bot.env
+-- override) exactly.
+CREATE DATABASE IF NOT EXISTS `attendence_utm`
   CHARACTER SET = utf8mb4
   COLLATE = utf8mb4_general_ci;
-USE `attandance_utm`;
+USE `attendence_utm`;
 
 -- 2) Groups
 CREATE TABLE IF NOT EXISTS `groups` (

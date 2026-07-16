@@ -5,11 +5,11 @@ $ENV = is_readable('/etc/attendance-bot.env')
   ? (parse_ini_file('/etc/attendance-bot.env', false, INI_SCANNER_TYPED) ?: [])
   : [];
 
-function env($k,$d=null){global $ENV; return $ENV[$k] ?? getenv($k) ?? $d;}
+function env($k,$d=null){global $ENV; if(array_key_exists($k,$ENV)&&$ENV[$k]!=='')return $ENV[$k]; $v=getenv($k); return ($v===false||$v==='')?$d:$v;}
 
 define('APP_HOST', env('APP_HOST','https://pi.anikor.eu'));
 define('SECRET_TOKEN', env('SECRET_TOKEN', ''));
-define('BOT_TOKEN',env('BOT_TOKEN',''));
+define('BOT_TOKEN',env('BOT_TOKEN','')); if(BOT_TOKEN===''){error_log('FATAL: BOT_TOKEN missing');http_response_code(500);exit('Config error');}
 
 $DB_HOST = env('DB_HOST','127.0.0.1');
 $DB_NAME = env('DB_NAME','attendence_utm');   // note spelling as in your dump
