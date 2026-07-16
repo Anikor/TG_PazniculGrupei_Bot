@@ -1,0 +1,26 @@
+; Place at: /etc/mysql/mariadb.conf.d/60-pi.cnf
+;
+; MariaDB's defaults assume a real server, not a Pi Zero 2W's 512MB. Applied
+; on top of whatever's already running -- restart MariaDB after adding this
+; file (`sudo systemctl restart mariadb`).
+
+[mysqld]
+performance_schema             = OFF   ; alone can hold tens of MB you don't have
+innodb_buffer_pool_size        = 64M   ; the whole DB is a few MB
+key_buffer_size                = 8M
+tmp_table_size                 = 8M
+max_heap_table_size            = 8M
+max_connections                = 20
+innodb_flush_log_at_trx_commit = 2     ; big cut in SD-card writes; can lose
+                                        ; <=1s of commits on a hard power
+                                        ; cut. Fine for attendance data, but
+                                        ; a deliberate trade -- your call.
+skip_name_resolve              = ON    ; also removes a DNS lookup per
+                                        ; connection, and is why
+                                        ; 'user'@'127.0.0.1' grants behave
+                                        ; oddly without it
+
+; SD card longevity, beyond this file:
+;   - log2ram, or point logs at tmpfs
+;   - skip-log-bin if you're not replicating
+;   - take periodic mysqldumps off-box; the card *will* die eventually
