@@ -1,4 +1,0 @@
-# script.js is hand-written, not minified output — its long single-line style
-# makes GitHub's linguist misclassify it as generated and exclude it from
-# language stats, which in turn hides JavaScript from CodeQL default setup.
-script.js linguist-generated=false
