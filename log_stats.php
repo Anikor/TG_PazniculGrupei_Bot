@@ -14,6 +14,7 @@ tg_require_role($user, ['admin','monitor','moderator']);
 
 // Group filter (0 = All)
 $selectedGroupId = (int)($_GET['group_id'] ?? 0);
+if ($selectedGroupId < 0) { $selectedGroupId = 0; } // normalize junk (e.g. ?group_id=-1) to "all"; otherwise it slips past both guards below and groupClause() emits no filter
 if ($selectedGroupId === 0 && $user['role'] !== 'admin') { $selectedGroupId = (int)$user['group_id']; }
 elseif ($selectedGroupId > 0) { $selectedGroupId = tg_resolve_group_id($user, $selectedGroupId); }
 

@@ -3,10 +3,10 @@ require_once __DIR__.'/config.php';require_once __DIR__.'/db.php';require_once _
 require_once __DIR__.'/tg_auth.php';$me=tg_require_auth();tg_require_role($me,['admin','monitor','moderator']);
 if($_SERVER['REQUEST_METHOD']==='POST'&&str_contains($_SERVER['CONTENT_TYPE']??'','application/json')){
     header('Content-Type:application/json; charset=UTF-8');
+    tg_require_same_origin();
     $raw=file_get_contents('php://input');
     $data=json_decode($raw,true);
     if(!$data||!isset($data['attendance'])||!is_array($data['attendance'])){http_response_code(400);echo json_encode(['success'=>false,'error'=>'Invalid request']);exit;}
-    tg_require_same_origin();
     $actorId=(int)$me['id'];$actorName=(string)$me['name'];
     $offset=(int)($_GET['offset']??0);
     $date=date('Y-m-d',strtotime(($offset>=0?'+':'').$offset.' days'));

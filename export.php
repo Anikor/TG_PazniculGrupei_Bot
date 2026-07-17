@@ -88,7 +88,7 @@ switch ($action) {
         break;
     case 'subject':
         $where = "AND s.subject = :subject";
-        $params[':subject'] = $_GET['subject'];
+        $params[':subject'] = is_array($_GET['subject']) ? '' : (string)$_GET['subject']; // ?subject[]=x would otherwise bind an array to PDO and 500
         $from = '1970-01-01';
         $to = date('Y-m-d');
         break;
