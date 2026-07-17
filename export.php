@@ -136,9 +136,13 @@ foreach ($rows as $r) {
     $subj = $r['subject'];
     $iso  = $r['date'];
     $stu  = $r['student'];
-    $pres = $r['present'];
+    // #3: a subject can meet twice in one day (curs + sem). Collapse
+    // deterministically — present if present in ANY same-day session — so the
+    // single cell never depends on undefined row order and never marks a
+    // student absent who attended part of that day.
+    $pres = !empty($r['present']) ? 1 : 0;
     $data[$subj]['dates'][$iso] = true;
-    $data[$subj]['students'][$stu][$iso] = $pres;
+    $data[$subj]['students'][$stu][$iso] = max($data[$subj]['students'][$stu][$iso] ?? 0, $pres);
 }
 
 foreach ($data as $subj => $tbl) {
@@ -154,7 +158,11 @@ foreach ($data as $subj => $tbl) {
     foreach ($students as $stuName) {
         $row = [csv_safe($stuName)];
         foreach ($isoDates as $d) {
-            $row[] = !empty($tbl['students'][$stuName][$d]) ? '' : 'a';
+            // #2: no record for this student/date (e.g. the other subgroup's
+            // day) is a BLANK cell, not 'a'. "No class" and "absent" differ;
+            // 'a' means an actual present=0 row.
+            $cell = $tbl['students'][$stuName][$d] ?? null;
+            $row[] = ($cell === null || $cell) ? '' : 'a';
         }
         csv_row($out, $row);
     }
