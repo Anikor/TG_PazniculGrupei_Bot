@@ -53,6 +53,21 @@ if ($action === 'subject' && !isset($_GET['subject'])) {
     render_page('Select Subject', $links, $group_id);
 }
 
+// Second step: subject chosen, no type yet → offer "All" plus only the lesson
+// types this subject actually has (no empty Lab/Sem/Curs buttons).
+if ($action === 'subject' && isset($_GET['subject']) && !isset($_GET['type'])) {
+    $subject = is_array($_GET['subject']) ? '' : (string)$_GET['subject'];
+    $tSt = $pdo->prepare("SELECT DISTINCT type FROM schedule WHERE group_id = ? AND subject = ? AND type IS NOT NULL AND type <> '' ORDER BY type");
+    $tSt->execute([$group_id, $subject]);
+    $types = $tSt->fetchAll(PDO::FETCH_COLUMN);
+    $subjQ = urlencode($subject);
+    $links = [['label'=>'All', 'url'=>"?action=subject&subject={$subjQ}&type=all&group_id={$group_id}"]];
+    foreach ($types as $t) {
+        $links[] = ['label'=>ucfirst($t), 'url'=>"?action=subject&subject={$subjQ}&type=".urlencode($t)."&group_id={$group_id}"];
+    }
+    render_page('Select Lesson Type — '.$subject, $links, $group_id);
+}
+
 if ($action === 'student' && !isset($_GET['student_id'])) {
     $uSt = $pdo->prepare("SELECT id,name FROM users WHERE group_id = ?");
     $uSt->execute([$group_id]);
@@ -89,6 +104,11 @@ switch ($action) {
     case 'subject':
         $where = "AND s.subject = :subject";
         $params[':subject'] = is_array($_GET['subject']) ? '' : (string)$_GET['subject']; // ?subject[]=x would otherwise bind an array to PDO and 500
+        $type = $_GET['type'] ?? 'all';
+        if (!is_array($type) && $type !== 'all' && $type !== '') { // 'all' = every type; otherwise filter to the chosen curs/sem/lab
+            $where .= " AND s.type = :type";
+            $params[':type'] = (string)$type;
+        }
         $from = '1970-01-01';
         $to = date('Y-m-d');
         break;
@@ -118,7 +138,13 @@ while (ob_get_level()) { ob_end_clean(); }
 
 $safeGroup = preg_replace('/[^\w]+/u', '_', mb_strtolower($group_name));
 $fileDate = date('d.m.Y');
-$filename = "{$safeGroup}_attendance_{$action}_{$fileDate}.csv";
+$actionLabel = $action;
+if ($action === 'subject') {
+    $subjSafe = preg_replace('/[^\w]+/u', '_', mb_strtolower((string)($_GET['subject'] ?? '')));
+    $typeSafe = preg_replace('/[^\w]+/u', '_', mb_strtolower((string)($_GET['type'] ?? 'all')));
+    $actionLabel = "subject_{$subjSafe}_{$typeSafe}";
+}
+$filename = "{$safeGroup}_attendance_{$actionLabel}_{$fileDate}.csv";
 header('Content-Type: text/csv; charset=UTF-8');
 header("Content-Disposition: attachment; filename=\"$filename\"");
 
