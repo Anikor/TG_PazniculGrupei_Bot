@@ -88,11 +88,13 @@ function tg_parse_qs(string $qs): array
  * secret_key    = HMAC_SHA256(key: "WebAppData", msg: bot_token)
  * expected_hash = HMAC_SHA256(key: secret_key,   msg: data_check_string)
  *
- * data_check_string = all pairs EXCEPT `hash` and `signature`, formatted
- * "k=v", sorted alphabetically by key, joined with "\n".
+ * data_check_string = all pairs EXCEPT `hash`, formatted "k=v", sorted
+ * alphabetically by key, joined with "\n".
  *
- * `signature` is Telegram's newer Ed25519 field for third-party validation and
- * must be excluded here — including it makes every real login fail.
+ * Telegram's `hash` empirically covers the newer Ed25519 `signature` field
+ * (verified against a real iOS payload, 2026-07), but docs and older payloads
+ * disagree — so BOTH constructions (with and without `signature`) are
+ * accepted. Each is an HMAC under the bot token; the union is just as strong.
  *
  * @return array{id:int,...}|null Validated Telegram user, or null if untrusted.
  */
@@ -108,23 +110,32 @@ function tg_validate_init_data(string $initData, string $botToken, int $maxAgeSe
     if ($hash === '' || !preg_match('/^[a-f0-9]{64}$/i', $hash)) {
         return null;
     }
-    unset($fields['hash'], $fields['signature']);
+    unset($fields['hash']);
 
     if ($fields === []) {
         return null;
     }
 
     ksort($fields, SORT_STRING);
-    $pairs = [];
+    $withSig    = [];
+    $withoutSig = [];
     foreach ($fields as $k => $v) {
-        $pairs[] = $k . '=' . $v;
+        $pair = $k . '=' . $v;
+        $withSig[] = $pair;
+        if ($k !== 'signature') {
+            $withoutSig[] = $pair;
+        }
     }
-    $dcs = implode("\n", $pairs);
 
-    $secretKey     = hash_hmac('sha256', $botToken, 'WebAppData', true);
-    $expectedHash  = hash_hmac('sha256', $dcs, $secretKey);
-
-    if (!hash_equals($expectedHash, strtolower($hash))) {
+    $secretKey = hash_hmac('sha256', $botToken, 'WebAppData', true);
+    $ok = false;
+    foreach ([$withSig, $withoutSig] as $pairs) {
+        if (hash_equals(hash_hmac('sha256', implode("\n", $pairs), $secretKey), strtolower($hash))) {
+            $ok = true;
+            break;
+        }
+    }
+    if (!$ok) {
         return null;
     }
 
