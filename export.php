@@ -68,6 +68,10 @@ $stmt->execute([$group_id]);
 $group_name = $stmt->fetchColumn() ?: "Group #{$group_id}";
 
 $where = '';
+// Intentional: schedule.semester is maintained manually and the DB only ever
+// holds ONE semester — it is dropped and reseeded each term (~every 3-4
+// months). The filter guards against accidental cross-term leftovers, not
+// against a second semester coexisting. Do not "fix" by removing it.
 $params = [':group_id'=>$group_id, ':semester'=>$currentSemester];
 switch ($action) {
     case 'week':

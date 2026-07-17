@@ -30,6 +30,7 @@ $DB_HOST = env('DB_HOST','127.0.0.1');
 $DB_NAME = env('DB_NAME','attendence_utm');   // note spelling as in your dump
 $DB_USER = env('DB_USER','paznic');
 $DB_PASS = env('DB_PASS','');
+if ($DB_PASS === '') { error_log('FATAL: DB_PASS missing'); http_response_code(500); exit('Config error'); } // fail closed, like BOT_TOKEN
 
 $dsn = "mysql:host=$DB_HOST;port=3306;dbname=$DB_NAME;charset=utf8mb4"; // force TCP
 try {
