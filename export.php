@@ -104,7 +104,7 @@ switch ($action) {
 $params[':from'] = $from;
 $params[':to'] = $to;
 
-$sql = "SELECT a.date, s.subject, u.name AS student, a.present
+$sql = "SELECT a.date, s.subject, s.type, u.name AS student, a.present
         FROM attendance a
         JOIN schedule s ON s.id = a.schedule_id
         JOIN users u ON u.id = a.user_id
@@ -134,34 +134,36 @@ csv_row($out, []);
 $data = [];
 foreach ($rows as $r) {
     $subj = $r['subject'];
-    $iso  = $r['date'];
+    // #3: one column per (date, lesson type) — curs and sem on the same day
+    // get SEPARATE columns, labeled by a type row under the date row. If the
+    // same type somehow repeats that day, sessions merge via max (present in
+    // any session of that type = present) so the cell stays deterministic.
+    $col  = $r['date'] . '|' . (string)($r['type'] ?? '');
     $stu  = $r['student'];
-    // #3: a subject can meet twice in one day (curs + sem). Collapse
-    // deterministically — present if present in ANY same-day session — so the
-    // single cell never depends on undefined row order and never marks a
-    // student absent who attended part of that day.
     $pres = !empty($r['present']) ? 1 : 0;
-    $data[$subj]['dates'][$iso] = true;
-    $data[$subj]['students'][$stu][$iso] = max($data[$subj]['students'][$stu][$iso] ?? 0, $pres);
+    $data[$subj]['cols'][$col] = true;
+    $data[$subj]['students'][$stu][$col] = max($data[$subj]['students'][$stu][$col] ?? 0, $pres);
 }
 
 foreach ($data as $subj => $tbl) {
-    $isoDates = array_keys($tbl['dates']);
-    sort($isoDates, SORT_STRING); // Y-m-d sorts correctly lexically
+    $cols = array_keys($tbl['cols']);
+    sort($cols, SORT_STRING); // "Y-m-d|type": chronological, then type A→Z within a day
     $students = array_keys($tbl['students']);
     sort($students, SORT_STRING);
 
     csv_row($out, ['Subject', csv_safe($subj)]);
-    $dateCells = array_map(fn($d) => date('d.m.Y', strtotime($d)), $isoDates);
+    $dateCells = array_map(fn($c) => date('d.m.Y', strtotime(substr($c, 0, 10))), $cols);
+    $typeCells = array_map(fn($c) => csv_safe(substr($c, 11)), $cols);
     csv_row($out, array_merge([''], $dateCells));
+    csv_row($out, array_merge([''], $typeCells)); // "curs" / "sem" / "lab" under each date
 
     foreach ($students as $stuName) {
         $row = [csv_safe($stuName)];
-        foreach ($isoDates as $d) {
-            // #2: no record for this student/date (e.g. the other subgroup's
-            // day) is a BLANK cell, not 'a'. "No class" and "absent" differ;
-            // 'a' means an actual present=0 row.
-            $cell = $tbl['students'][$stuName][$d] ?? null;
+        foreach ($cols as $c) {
+            // #2: no record for this student/lesson (e.g. the other
+            // subgroup's session) is a BLANK cell, not 'a'. "No class" and
+            // "absent" differ; 'a' means an actual present=0 row.
+            $cell = $tbl['students'][$stuName][$c] ?? null;
             $row[] = ($cell === null || $cell) ? '' : 'a';
         }
         csv_row($out, $row);
