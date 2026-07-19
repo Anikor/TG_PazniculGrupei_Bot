@@ -468,7 +468,7 @@ View live HTTP logs at: http://127.0.0.1:4040/inspect/http
 | `DB_NAME` | Database name (must match `init_db.sql`) | `attendence_utm` |
 | `DB_USER` | Database user | `DBuser` |
 | `DB_PASS` | Database password | `your-secure-password` |
-| `APP_TZ` | App timezone (all dates/locks) | `Europe/Chisinau` |
+| `APP_TZ` | App timezone (all dates/locks) | `Europe/Helsinki` |
 | `PRIMARY_GROUP_NAME` | Group behind the admin "Primary" button | `R-241` |
 | `SECONDARY_TG_ID` | tg_id behind the admin "Secondary" button (empty hides it) | `123456789` |
 | `SESSION_MAX_AGE_DAYS` | Session lifetime; re-auth is silent via Telegram initData | `7` |
