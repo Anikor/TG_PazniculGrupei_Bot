@@ -18,9 +18,11 @@
 .sb-check { display: inline-flex; align-items: center; gap: .3rem; }
 .sb-dirty { color: var(--sb-lab); font-weight: 700; font-size: .9rem; }
 
-.sb-banner { margin: .6rem 0; padding: .6rem .8rem; border-radius: 6px; border: 1px solid; }
+/* Toast: fixed, so showing a message never scrolls or reflows the page. */
+.sb-banner { position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 1200; width: max-content; max-width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: .6rem .9rem; border-radius: 8px; border: 1px solid; font-size: .92rem; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .28); }
 .sb-banner.ok { background: var(--even-bg); color: var(--even-fg); border-color: var(--even-fg); }
-.sb-banner.err { background: rgba(211, 47, 47, .12); color: var(--fg); border-color: var(--sb-danger); }
+.sb-banner.info { background: var(--odd-bg); color: var(--odd-fg); border-color: var(--odd-fg); }
+.sb-banner.err { background: var(--bg); color: var(--fg); border-color: var(--sb-danger); border-width: 2px; }
 
 .sb-hint { font-size: .85rem; margin: .6rem 0 0; }
 .sb-palette-panel { margin: .5rem 0 .75rem; padding: 8px 10px; }

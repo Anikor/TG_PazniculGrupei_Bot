@@ -197,6 +197,8 @@ Admins get a **🗓 Schedule Builder** button on the schedule page. It replaces 
 ### Save
 - **Save schedule** writes straight to the database in one transaction. Existing lessons are updated in place, so attendance already logged against them stays linked. New lessons get the current semester number (which `export.php` filters on).
 - A lesson that already has attendance (🔒) can be moved and edited but not removed.
+- Unsaved changes are kept as a draft in the browser, so a reload or a closed Telegram webview doesn't lose them; **Revert** discards the draft.
+- Placing or copying a lesson that is already in that slot is refused ("Already added") instead of creating a double.
 
 ### New semester
 - The database holds one semester at a time. **Start new semester…** deletes the whole schedule together with all attendance and its edit history for every group (students and groups are kept), after you type `NEW SEMESTER`. The block palette is emptied too, unless you tick *Keep last term's lesson blocks*. **Back up the database first.**

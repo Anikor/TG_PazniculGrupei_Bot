@@ -17,6 +17,7 @@
   const WEEKS = [[null, 'every week'], ['odd', 'odd'], ['even', 'even']];
   const SLOT_RE = /^([01]\d|2[0-3]):([0-5]\d)-([01]\d|2[0-3]):([0-5]\d)$/;
   const LS_KEY = 'sb.v1';
+  const DRAFT_KEY = 'sb.draft.v1';
 
   // ---- state ---------------------------------------------------------------
   let rows = [];
@@ -52,6 +53,35 @@
     return JSON.stringify(rows.map(wire).sort((a, b) => JSON.stringify(a) < JSON.stringify(b) ? -1 : 1));
   }
   const isDirty = () => serialize() !== snapshot;
+
+  // Same lesson for a group = same cell, week, subgroup, subject and type. The
+  // room is deliberately ignored: a second copy in another room is still a double.
+  const sameLesson = (a, b) => a.group_id === b.group_id && a.day_of_week === b.day_of_week && a.time_slot === b.time_slot
+    && (a.week_type || null) === (b.week_type || null) && (a.subgroup || null) === (b.subgroup || null)
+    && a.subject === b.subject && (a.type || null) === (b.type || null);
+  const findSame = (probe, except) => rows.find((x) => x !== except && sameLesson(x, probe));
+
+  // Unsaved work survives a reload / a killed Telegram webview.
+  function saveDraft() {
+    try {
+      if (isDirty()) localStorage.setItem(DRAFT_KEY, JSON.stringify({ rows: rows.map(wire) }));
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch { /* private mode */ }
+  }
+  function restoreDraft() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { /* corrupt */ }
+    if (!d || !Array.isArray(d.rows)) return false;
+    // A draft row pointing at a lesson that no longer exists can't be saved; drop the draft then.
+    const known = new Set(rows.map((r) => r.id));
+    if (d.rows.some((r) => r.id !== null && !known.has(r.id)) || d.rows.some((r) => !groupName[r.group_id])) {
+      try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+      return false;
+    }
+    rows = d.rows.map((r) => Object.assign({ cid: cidSeq++ }, r));
+    if (rows.some((r) => r.day_of_week === 'Saturday')) prefs.sat = true;
+    return isDirty();
+  }
   const locked = (r) => (r.id && attCount[r.id]) || 0;
 
   // ---- helpers -------------------------------------------------------------
@@ -232,6 +262,7 @@
     const ul = $('sb-warn-list'); ul.textContent = '';
     warn.forEach((w) => ul.append(el('li', { text: w })));
     refreshDirty();
+    saveDraft();
   }
 
   function blockEl(r, conflict) {
@@ -255,14 +286,21 @@
   }
   function renderAll() { renderViewTabs(); renderPalette(); renderGrids(); $('sb-sat').checked = !!prefs.sat; }
 
+  // A fixed toast: feedback must never move the page under the user's hands.
+  // Confirmations fade on their own; errors stay until tapped.
+  let bannerTimer = 0;
   function banner(msg, kind) {
     const b = $('sb-banner');
+    clearTimeout(bannerTimer);
     b.hidden = !msg; b.textContent = msg || ''; b.className = 'sb-banner ' + (kind || 'ok');
-    if (msg) b.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    if (msg && kind !== 'err') bannerTimer = setTimeout(() => { b.hidden = true; }, 6000);
   }
+  $('sb-banner').addEventListener('click', () => banner(''));
 
   // ---- mutations -----------------------------------------------------------
   function place(tpl, ds) {
+    const probe = { group_id: Number(ds.gid), day_of_week: ds.day, time_slot: ds.slot, week_type: ds.week || null, subgroup: tpl.subgroup || null, subject: tpl.subject, type: tpl.type || null };
+    if (findSame(probe)) { banner('Already added — “' + tpl.subject + '” is already in ' + groupName[probe.group_id] + ' at ' + DAY_SHORT[ds.day] + ' ' + ds.slot + '.', 'info'); return; }
     rows.push({
       cid: cidSeq++, id: null, group_id: Number(ds.gid), day_of_week: ds.day, time_slot: ds.slot,
       subject: tpl.subject, location: tpl.location || null, type: tpl.type || null,
@@ -272,6 +310,8 @@
   }
   function moveRow(r, ds) {
     if (Number(ds.gid) !== r.group_id) { place(r, ds); return; } // other group's grid: copy → shared lecture
+    const probe = Object.assign({}, r, { day_of_week: ds.day, time_slot: ds.slot, week_type: ds.week || null });
+    if (findSame(probe, r)) { banner('Already added — the same lesson is already in that slot.', 'info'); return; }
     r.day_of_week = ds.day; r.time_slot = ds.slot; r.week_type = ds.week || null;
     renderGrids();
   }
@@ -415,6 +455,7 @@
     const day = select((prefs.sat || r.day_of_week === 'Saturday' ? DAYS : DAYS.slice(0, 5)).map((d) => [d, d]), r.day_of_week);
     const slot = select(allSlots().map((s) => [s, s.replace('-', '–')]), r.time_slot);
     const others = boot.groups.filter((g) => g.id !== r.group_id);
+    const syncers = [];
 
     const apply = () => {
       const s = subject.value.trim();
@@ -435,15 +476,19 @@
       el('div', { class: 'sb-row' }, field('Day', day), field('Time', slot)),
       el('div', { class: 'sb-actions' },
         el('button', { type: 'submit', class: 'btn-submit', text: 'Apply' }),
-        others.map((g) => el('button', {
-          type: 'button', class: 'btn-nav', text: 'Copy to ' + g.name,
-          onclick: () => {
-            if (!apply()) return;
+        others.map((g) => {
+          const btn = el('button', { type: 'button', class: 'btn-nav' });
+          // Reads the form, not r: the label must follow edits made in this dialog.
+          const probe = () => ({ group_id: g.id, day_of_week: day.value, time_slot: slot.value, week_type: week.value || null, subgroup: sg.value ? Number(sg.value) : null, subject: subject.value.trim(), type: type.value || null });
+          const sync = () => { const there = !!findSame(probe()); btn.disabled = there; btn.textContent = there ? '✓ Already added to ' + g.name : 'Copy to ' + g.name; };
+          btn.addEventListener('click', () => {
+            if (findSame(probe()) || !apply()) { sync(); return; }
             rows.push(Object.assign({}, r, { cid: cidSeq++, id: null, group_id: g.id }));
-            closeModal(); renderPalette(); renderGrids();
-            banner('Copied “' + r.subject + '” to ' + g.name + ' (' + DAY_SHORT[r.day_of_week] + ' ' + r.time_slot + ').', 'ok');
-          },
-        })),
+            renderPalette(); renderGrids(); sync(); // dialog stays open: the button itself is the confirmation
+          });
+          syncers.push(sync); sync();
+          return btn;
+        }),
         el('button', {
           type: 'button', class: 'btn-nav', text: 'Duplicate',
           onclick: () => { if (!apply()) return; const c = Object.assign({}, r, { cid: cidSeq++, id: null }); rows.push(c); renderGrids(); openEditor(c); },
@@ -453,6 +498,7 @@
           onclick: () => { closeModal(); removeRow(r); },
         }),
         el('button', { type: 'button', class: 'btn-nav', text: 'Cancel', onclick: closeModal })));
+    form.addEventListener('input', () => syncers.forEach((f) => f()));
     openModal(form);
   }
 
@@ -484,7 +530,7 @@
       el('h3', { text: 'Discard unsaved changes?' }),
       el('p', { class: 'muted', text: 'The grid goes back to what is saved on the server.' }),
       el('div', { class: 'sb-actions' },
-        el('button', { type: 'button', class: 'btn-nav sb-danger-btn', text: 'Discard', onclick: () => { snapshot = serialize(); location.reload(); } }), // snapshot: skip the beforeunload prompt
+        el('button', { type: 'button', class: 'btn-nav sb-danger-btn', text: 'Discard', onclick: () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } snapshot = serialize(); location.reload(); } }), // snapshot: skip the beforeunload prompt
         el('button', { type: 'button', class: 'btn-nav', text: 'Keep editing', onclick: closeModal }))));
   });
 
@@ -582,5 +628,7 @@
   window.addEventListener('beforeunload', (e) => { if (isDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
   adopt(boot);
+  const restored = restoreDraft();
   renderAll();
+  if (restored) banner('Restored your unsaved changes from this device. Use Revert to discard them.', 'info');
 })();
