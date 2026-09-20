@@ -300,6 +300,7 @@ header('Content-Type: text/html; charset=UTF-8');
   <div class="sb-palette-head">
     <p class="panel-title">Lesson blocks</p>
     <input type="search" id="sb-filter" class="sb-filter" placeholder="Filter…" aria-label="Filter lesson blocks" autocomplete="off">
+    <button type="button" class="btn-nav" id="sb-clear-unused" title="Remove every block that is not placed on the grid" hidden>Clear unused</button>
     <button type="button" class="btn-nav" id="sb-nb-toggle" aria-expanded="false" aria-controls="sb-new-block">+ New block</button>
   </div>
   <form id="sb-new-block" class="sb-new-block" autocomplete="off" hidden>

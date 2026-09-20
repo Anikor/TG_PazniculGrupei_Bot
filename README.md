@@ -199,7 +199,7 @@ Admins get a **🗓 Schedule Builder** button on the schedule page. It replaces 
 - A lesson that already has attendance (🔒) can be moved and edited but not removed.
 
 ### New semester
-- The database holds one semester at a time. **Start new semester…** deletes the whole schedule together with all attendance and its edit history for every group (students and groups are kept), after you type `NEW SEMESTER`. Last term's blocks stay in the palette. **Back up the database first.**
+- The database holds one semester at a time. **Start new semester…** deletes the whole schedule together with all attendance and its edit history for every group (students and groups are kept), after you type `NEW SEMESTER`. The block palette is emptied too, unless you tick *Keep last term's lesson blocks*. **Back up the database first.**
 
 ## Project Structure
 

@@ -164,6 +164,7 @@
       bindDrag(chip, { kind: 'tpl', tpl: t });
       box.append(chip);
     });
+    $('sb-clear-unused').hidden = !paletteItems().some((t) => t.custom);
     document.body.classList.toggle('sb-armed', !!armed);
     $('sb-armed-pill').hidden = !armed;
     if (armed) $('sb-armed-text').textContent = 'Tap a slot to place “' + armed.subject + '”';
@@ -492,18 +493,22 @@
     const saved = rows.filter((r) => r.id).length;
     const input = el('input', { type: 'text', autocomplete: 'off', autocapitalize: 'characters', placeholder: boot.resetPhrase });
     const go = el('button', { type: 'submit', class: 'btn-nav sb-danger-btn', text: 'Delete everything', disabled: true });
+    const keep = el('input', { type: 'checkbox' });
     input.addEventListener('input', () => { go.disabled = input.value.trim() !== boot.resetPhrase; });
     openModal(el('form', {
       class: 'sb-editor',
       onsubmit: async (e) => {
         e.preventDefault(); go.disabled = true; go.textContent = 'Deleting…';
         try {
-          // Keep last term's blocks in the palette: some subjects carry over.
-          const keep = paletteItems().map((t) => ({ subject: t.subject, type: t.type || null, location: t.location || null }));
+          // A new term mostly means new subjects, so the palette empties too —
+          // unless asked to carry last term's blocks over (PE and the like).
+          const carried = keep.checked ? paletteItems().map((t) => ({ subject: t.subject, type: t.type || null, location: t.location || null })) : [];
           const d = await api({ action: 'new_semester', confirm: input.value.trim() });
-          prefs.palette = keep; savePrefs();
+          prefs.palette = carried; prefs.slots = []; armed = null; savePrefs();
+          $('sb-filter').value = '';
           adopt(d); closeModal(); renderAll();
-          banner('✅ New semester started — removed ' + d.deleted.schedule + ' lessons and ' + d.deleted.attendance + ' attendance records. Last term’s blocks stay in the palette; remove the ones you no longer need with ×.', 'ok');
+          banner('✅ New semester started — removed ' + d.deleted.schedule + ' lessons and ' + d.deleted.attendance + ' attendance records. '
+            + (carried.length ? 'Last term’s ' + carried.length + ' lesson blocks were kept in the palette.' : 'Add this term’s subjects with “+ New block”.'), 'ok');
         } catch (err) { closeModal(); banner('❌ ' + err.message, 'err'); }
       },
     },
@@ -511,6 +516,7 @@
       el('p', { text: 'This permanently deletes ' + saved + ' saved lessons and ' + totalAtt + ' attendance records (plus their edit history) for ALL groups.' }),
       isDirty() ? el('p', { class: 'sb-note', text: 'Your unsaved changes on this page will be discarded too.' }) : null,
       el('p', { class: 'sb-note', text: 'Run a backup on the Pi first (manual-backup.sh). This cannot be undone from the app.' }),
+      el('label', { class: 'sb-check sb-keep' }, keep, 'Keep last term’s lesson blocks in the palette'),
       field('Type ' + boot.resetPhrase + ' to confirm', input),
       el('div', { class: 'sb-actions' }, go, el('button', { type: 'button', class: 'btn-nav', text: 'Cancel', onclick: closeModal }))));
   });
@@ -557,6 +563,8 @@
   });
 
   $('sb-filter').addEventListener('input', renderPalette);
+  // "custom" = not placed anywhere on the grid; blocks in use come from the rows themselves.
+  $('sb-clear-unused').addEventListener('click', () => { prefs.palette = []; armed = null; savePrefs(); renderPalette(); });
   $('sb-nb-toggle').addEventListener('click', () => {
     const f = $('sb-new-block'); f.hidden = !f.hidden;
     $('sb-nb-toggle').setAttribute('aria-expanded', String(!f.hidden));
