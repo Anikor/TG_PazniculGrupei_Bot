@@ -106,7 +106,6 @@ table.sb-grid .sb-timecol { width: 52px; font-size: .78rem; vertical-align: midd
 .sb-warnings ul { margin: .5rem 0 0; padding-left: 1.2rem; font-size: .88rem; }
 .sb-warnings li { margin: .2rem 0; }
 
-.sb-danger { margin-top: 2rem; border-color: var(--sb-danger); }
 .sb-danger-btn { color: var(--sb-danger) !important; border: 1px solid var(--sb-danger) !important; cursor: pointer; background: transparent !important; }
 .sb-danger-btn[disabled] { opacity: .45; cursor: default; }
 
@@ -118,7 +117,6 @@ table.sb-grid .sb-timecol { width: 52px; font-size: .78rem; vertical-align: midd
 .sb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .sb-field { display: flex; flex-direction: column; gap: 3px; margin: .45rem 0; font-size: .85rem; }
 .sb-field input, .sb-field select { width: 100%; box-sizing: border-box; font-size: 1rem; }
-.sb-keep { margin: .6rem 0 .2rem; font-size: .9rem; }
 .sb-note { font-size: .85rem; padding: .45rem .6rem; border-radius: 6px; background: var(--odd-bg); color: var(--odd-fg); }
 .sb-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: .8rem; }
 .sb-actions .btn-nav, .sb-actions .btn-submit { margin: 0; padding: 8px 12px; font-size: .9rem; cursor: pointer; border: 1px solid var(--bd); }

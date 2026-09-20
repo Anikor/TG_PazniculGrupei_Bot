@@ -469,7 +469,7 @@
     };
     const form = el('form', { class: 'sb-editor', onsubmit: (e) => { e.preventDefault(); if (apply()) { closeModal(); renderPalette(); renderGrids(); } } },
       el('h3', { text: groupName[r.group_id] + ' · lesson' }),
-      n ? el('p', { class: 'sb-note', text: '🔒 ' + n + ' attendance records are attached. Edits keep them linked; the lesson cannot be removed until the next “New semester”.' }) : null,
+      n ? el('p', { class: 'sb-note', text: '🔒 ' + n + ' attendance records are attached. Edits keep them linked, but the lesson cannot be removed while attendance exists.' }) : null,
       field('Subject', subject),
       el('div', { class: 'sb-row' }, field('Type', type), field('Room', room)),
       el('div', { class: 'sb-row' }, field('Weeks', week), field('Subgroup', sg)),
@@ -532,39 +532,6 @@
       el('div', { class: 'sb-actions' },
         el('button', { type: 'button', class: 'btn-nav sb-danger-btn', text: 'Discard', onclick: () => { try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } snapshot = serialize(); location.reload(); } }), // snapshot: skip the beforeunload prompt
         el('button', { type: 'button', class: 'btn-nav', text: 'Keep editing', onclick: closeModal }))));
-  });
-
-  $('sb-reset').addEventListener('click', () => {
-    const totalAtt = Object.values(attCount).reduce((a, b) => a + b, 0);
-    const saved = rows.filter((r) => r.id).length;
-    const input = el('input', { type: 'text', autocomplete: 'off', autocapitalize: 'characters', placeholder: boot.resetPhrase });
-    const go = el('button', { type: 'submit', class: 'btn-nav sb-danger-btn', text: 'Delete everything', disabled: true });
-    const keep = el('input', { type: 'checkbox' });
-    input.addEventListener('input', () => { go.disabled = input.value.trim() !== boot.resetPhrase; });
-    openModal(el('form', {
-      class: 'sb-editor',
-      onsubmit: async (e) => {
-        e.preventDefault(); go.disabled = true; go.textContent = 'Deleting…';
-        try {
-          // A new term mostly means new subjects, so the palette empties too —
-          // unless asked to carry last term's blocks over (PE and the like).
-          const carried = keep.checked ? paletteItems().map((t) => ({ subject: t.subject, type: t.type || null, location: t.location || null })) : [];
-          const d = await api({ action: 'new_semester', confirm: input.value.trim() });
-          prefs.palette = carried; prefs.slots = []; armed = null; savePrefs();
-          $('sb-filter').value = '';
-          adopt(d); closeModal(); renderAll();
-          banner('✅ New semester started — removed ' + d.deleted.schedule + ' lessons and ' + d.deleted.attendance + ' attendance records. '
-            + (carried.length ? 'Last term’s ' + carried.length + ' lesson blocks were kept in the palette.' : 'Add this term’s subjects with “+ New block”.'), 'ok');
-        } catch (err) { closeModal(); banner('❌ ' + err.message, 'err'); }
-      },
-    },
-      el('h3', { text: 'Start a new semester' }),
-      el('p', { text: 'This permanently deletes ' + saved + ' saved lessons and ' + totalAtt + ' attendance records (plus their edit history) for ALL groups.' }),
-      isDirty() ? el('p', { class: 'sb-note', text: 'Your unsaved changes on this page will be discarded too.' }) : null,
-      el('p', { class: 'sb-note', text: 'Run a backup on the Pi first (manual-backup.sh). This cannot be undone from the app.' }),
-      el('label', { class: 'sb-check sb-keep' }, keep, 'Keep last term’s lesson blocks in the palette'),
-      field('Type ' + boot.resetPhrase + ' to confirm', input),
-      el('div', { class: 'sb-actions' }, go, el('button', { type: 'button', class: 'btn-nav', text: 'Cancel', onclick: closeModal }))));
   });
 
   // ---- toolbar -------------------------------------------------------------

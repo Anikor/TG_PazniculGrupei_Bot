@@ -7,12 +7,13 @@ declare(strict_types=1);
  * Replaces the per-term routine of editing `schedule` by hand in phpMyAdmin.
  * GET renders the builder; POST (application/json) is its API:
  *
- *   {action:"save", rows:[…]}            full desired schedule, all groups
- *   {action:"new_semester", confirm:"…"} wipe attendance_log/attendance/schedule
+ *   {action:"save", rows:[…]}   full desired schedule, all groups
  *
  * Save is a diff, not a reseed: rows that keep their id are UPDATEd in place,
  * so attendance already logged against them stays linked. A row that has
- * attendance can never be deleted by a save — only by the explicit term reset.
+ * attendance can never be deleted here. Deliberately, NOTHING in this API can
+ * delete attendance: the per-term wipe (the DB holds one semester) is done by
+ * hand with SQL on the Pi, not from a public web endpoint.
  */
 
 require_once __DIR__.'/config.php';
@@ -27,7 +28,6 @@ tg_require_role($me, ['admin']);
 const SB_DAYS  = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 const SB_TYPES = ['curs','sem','lab'];
 const SB_WEEKS = ['odd','even'];
-const SB_RESET_PHRASE = 'NEW SEMESTER';
 
 [$currentSemester, , $currentWeek, $currentWeekType] =
     computeSemesterAndWeek(new DateTime('today', new DateTimeZone(APP_TZ)));
@@ -230,26 +230,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         sb_json(200, ['success' => true, 'inserted' => $inserted, 'updated' => $updated, 'deleted' => count($toDelete)] + sb_load_state($pdo));
     }
 
-    if ($action === 'new_semester') {
-        if (($data['confirm'] ?? '') !== SB_RESET_PHRASE) {
-            sb_json(400, ['success' => false, 'error' => 'Confirmation phrase does not match.']);
-        }
-        try {
-            $pdo->beginTransaction();
-            // FK order. DELETE, not TRUNCATE: TRUNCATE auto-commits and is refused on FK parents.
-            $nLog = $pdo->exec("DELETE FROM attendance_log");
-            $nAtt = $pdo->exec("DELETE FROM attendance");
-            $nSch = $pdo->exec("DELETE FROM schedule");
-            $pdo->commit();
-        } catch (Throwable $e) {
-            if ($pdo->inTransaction()) $pdo->rollBack();
-            error_log('schedule_builder new_semester failed: '.$e->getMessage());
-            sb_json(500, ['success' => false, 'error' => 'Database error — nothing was deleted.']);
-        }
-        error_log(sprintf('schedule_builder: user %d started a new semester (-%d schedule, -%d attendance, -%d log)', (int)$me['id'], $nSch, $nAtt, $nLog));
-        sb_json(200, ['success' => true, 'deleted' => ['schedule' => $nSch, 'attendance' => $nAtt, 'attendance_log' => $nLog]] + sb_load_state($pdo));
-    }
-
     sb_json(400, ['success' => false, 'error' => 'Unknown action']);
 }
 
@@ -265,7 +245,6 @@ $boot = [
     'semester'    => $currentSemester,
     'week'        => $currentWeek,
     'weekType'    => $currentWeekType,
-    'resetPhrase' => SB_RESET_PHRASE,
 ] + sb_load_state($pdo);
 
 $theme      = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
@@ -336,12 +315,6 @@ header('Referrer-Policy: same-origin');
 
 <div id="sb-trash" class="sb-trash" hidden>🗑 Drop here to remove</div>
 <div id="sb-armed-pill" class="sb-armed-pill" hidden><span id="sb-armed-text"></span><button type="button" id="sb-armed-cancel">Cancel</button></div>
-
-<section class="panel sb-danger">
-  <p class="panel-title">New semester</p>
-  <p class="muted">Deletes the whole schedule <b>and all attendance and edit history</b> for every group, so the new term starts from an empty grid. Students and groups are kept. Make a backup on the Pi first.</p>
-  <button type="button" class="btn-nav sb-danger-btn" id="sb-reset">Start new semester…</button>
-</section>
 
 <div id="sb-modal" class="sb-modal" hidden><div class="sb-modal-card" role="dialog" aria-modal="true"></div></div>
 

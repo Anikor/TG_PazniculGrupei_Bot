@@ -18,9 +18,11 @@ All notable changes on the `rpi-restructured` / `rpi-restructured-2` branches
   and removing a lesson that has attendance is refused (HTTP 409, full
   rollback). Every field is validated server-side against the column
   definitions in `init_db.sql`.
-- **New semester** action — typed-phrase-confirmed wipe of `attendance_log`,
-  `attendance` and `schedule` (FK order, one transaction), matching the
-  one-semester-per-database design documented in `export.php`.
+- No wipe endpoint: an earlier revision of this branch had a typed-phrase
+  "New semester" action that deleted `attendance_log`, `attendance` and
+  `schedule`. It was removed — it is needed twice a year and does not belong
+  on a public endpoint. Nothing in the builder API can delete attendance; the
+  per-term wipe is run by hand with SQL on the server.
 - **Request hardening (builder API only).** The media type must *be*
   `application/json`; the shared substring test also accepts
   `text/plain;application/json`, which needs no CORS preflight. A missing

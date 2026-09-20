@@ -201,7 +201,7 @@ Admins get a **🗓 Schedule Builder** button on the schedule page. It replaces 
 - Placing or copying a lesson that is already in that slot is refused ("Already added") instead of creating a double.
 
 ### New semester
-- The database holds one semester at a time. **Start new semester…** deletes the whole schedule together with all attendance and its edit history for every group (students and groups are kept), after you type `NEW SEMESTER`. The block palette is emptied too, unless you tick *Keep last term's lesson blocks*. **Back up the database first.**
+- The database holds one semester at a time, and a lesson with attendance cannot be removed in the builder. The per-term wipe is intentionally **not** available from the web app: back up, then run the wipe by hand on the server (`DELETE FROM attendance_log; DELETE FROM attendance; DELETE FROM schedule;` in one transaction), and build the new term in the builder on the empty grid.
 
 ## Project Structure
 
