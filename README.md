@@ -222,7 +222,7 @@ Admins get a **🗓 Schedule Builder** button on the schedule page. It replaces 
 ├── schedule_builder.php                # Admin-only drag & drop schedule constructor (page + JSON API)
 ├── schedule_builder.js                 # Builder client: palette, grid, pointer-event drag & drop, conflicts
 ├── schedule_builder.css                # Builder-only styles (reuses style.css theme tokens)
-├── script.js                           # Frontend UI logic (minified)
+├── script.js                           # Frontend UI logic
 ├── style.css                           # Single stylesheet (incl. compact/big schedule layouts, scoped to the greeting page)
 └── init_db.sql                         # SQL DB Structure example
 ```
