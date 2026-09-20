@@ -1,0 +1,130 @@
+/* schedule_builder.css — builder-only styles. Colours come from style.css
+   tokens (--bg --fg --bd --sec --btn, --odd-* / --even-*), so both themes work. */
+
+.sb-page { --sb-curs: #1e88e5; --sb-sem: #8e24aa; --sb-lab: #ef6c00; --sb-danger: #d32f2f; --sb-chip: var(--bg); padding-bottom: 5rem; }
+.dark-theme .sb-page, .dark-theme.sb-page { --sb-curs: #64b5f6; --sb-sem: #ce93d8; --sb-lab: #ffb74d; --sb-danger: #ef5350; }
+
+/* Several builder elements set their own display, which would beat [hidden]. */
+.sb-page [hidden] { display: none !important; }
+
+.sb-head { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; margin-top: .5rem; }
+.sb-head h2 { margin: 6px 0; }
+
+.sb-toolbar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; padding: .5rem 0; background: var(--bg); border-bottom: 1px solid var(--bd); }
+.sb-toolbar .btn-nav, .sb-toolbar .btn-submit { margin: 0; font-size: .95rem; cursor: pointer; }
+.sb-toolbar .btn-submit { padding: 7px 14px; }
+.sb-toolbar button[disabled] { opacity: .5; cursor: default; }
+.sb-spacer { flex: 1; }
+.sb-check { display: inline-flex; align-items: center; gap: .3rem; }
+.sb-dirty { color: var(--sb-lab); font-weight: 700; font-size: .9rem; }
+
+/* Toast: fixed, so showing a message never scrolls or reflows the page. */
+.sb-banner { position: fixed; left: 50%; bottom: 72px; transform: translateX(-50%); z-index: 1200; width: max-content; max-width: min(560px, calc(100vw - 32px)); box-sizing: border-box; padding: .6rem .9rem; border-radius: 8px; border: 1px solid; font-size: .92rem; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .28); }
+.sb-banner.ok { background: var(--even-bg); color: var(--even-fg); border-color: var(--even-fg); }
+.sb-banner.info { background: var(--odd-bg); color: var(--odd-fg); border-color: var(--odd-fg); }
+.sb-banner.err { background: var(--bg); color: var(--fg); border-color: var(--sb-danger); border-width: 2px; }
+
+.sb-hint { font-size: .85rem; margin: .6rem 0 0; }
+.sb-palette-panel { margin: .5rem 0 .75rem; padding: 8px 10px; }
+/* Pinned under the toolbar so blocks stay reachable while the grids scroll.
+   Kept to two chip rows: it must never take more than a sliver of a small window. */
+@media (min-width: 721px) and (min-height: 520px) { .sb-palette-panel { position: sticky; top: var(--sb-tb-h, 50px); z-index: 15; box-shadow: 0 4px 10px rgba(0, 0, 0, .12); } }
+.sb-palette-head { display: flex; gap: .5rem; align-items: center; }
+.sb-palette-head .panel-title { margin: 0; white-space: nowrap; }
+.sb-palette-head .btn-nav { margin: 0; cursor: pointer; border: 1px solid var(--bd); white-space: nowrap; font-size: .85rem; padding: 5px 10px; }
+.sb-page .sb-filter { flex: 1 1 6rem; min-width: 0; max-width: 16rem; margin-left: auto; padding: .25rem .5rem; font-size: .85rem; }
+/* --sb-row = one chip row incl. gap; max-height is a whole number of rows and
+   rows snap, so a row is never sliced in half at the scroll edge. */
+.sb-palette { --sb-row: 32px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; margin-top: 8px; padding: 2px; max-height: calc(var(--sb-row) * 2 - 6px + 4px); overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scroll-padding: 2px; }
+.sb-palette .sb-chip { scroll-snap-align: start; flex-wrap: nowrap; height: 26px; box-sizing: border-box; max-width: 100%; }
+.sb-palette .sb-subj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-new-block { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.sb-new-block .btn-nav { margin: 0; cursor: pointer; border: 1px solid var(--bd); }
+#sb-nb-subject { flex: 1 1 12rem; min-width: 0; }
+
+.sb-page input[type=text], .sb-page input[type=time], .sb-page select {
+  background: var(--bg); color: var(--fg); border: 1px solid var(--bd); border-radius: 6px; padding: .4rem .5rem; font: inherit; max-width: 100%;
+}
+
+/* ---- chips ---------------------------------------------------------------- */
+.sb-chip {
+  position: relative; display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px;
+  padding: 4px 6px; border: 1px solid var(--bd); border-radius: 6px;
+  background: var(--sb-chip); color: var(--fg); font-size: .8rem; line-height: 1.2; text-align: left;
+  cursor: grab; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.sb-chip:focus-visible { outline: 2px solid var(--btn); outline-offset: 1px; }
+.sb-type { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; }
+.sb-type-curs { color: var(--sb-curs); } .sb-type-sem { color: var(--sb-sem); } .sb-type-lab { color: var(--sb-lab); }
+.sb-subj { font-weight: 600; overflow-wrap: anywhere; }
+.sb-room, .sb-sg, .sb-lock { font-size: .7rem; padding: 0 4px; border-radius: 999px; background: var(--sec); border: 1px solid var(--bd); white-space: nowrap; }
+.sb-sg { border-color: var(--btn); }
+.sb-tpl.armed { outline: 2px solid var(--btn); outline-offset: 1px; }
+.sb-block { display: flex; width: 100%; box-sizing: border-box; }
+.sb-block.conflict { border-color: var(--sb-danger); box-shadow: inset 0 0 0 1px var(--sb-danger); }
+.sb-dragging { opacity: .35; }
+.sb-ghost { position: fixed; left: 0; top: 0; z-index: 1000; pointer-events: none; opacity: .92; box-shadow: 0 6px 18px rgba(0, 0, 0, .3); cursor: grabbing; max-width: 240px; }
+.sb-x { border: none; background: none; color: inherit; opacity: .6; cursor: pointer; font-size: 1rem; line-height: 1; padding: 0 2px; }
+.sb-x:hover { opacity: 1; color: var(--sb-danger); }
+
+/* ---- grid ----------------------------------------------------------------- */
+.sb-group { margin: 1rem 0 1.5rem; }
+.sb-group-title { margin: 0 0 .4rem; font-size: 1.05rem; }
+.sb-group-title .muted { font-weight: 400; font-size: .85rem; }
+.sb-grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--bd); border-radius: 8px; }
+table.sb-grid { margin: 0; min-width: 640px; table-layout: fixed !important; border-collapse: collapse; }
+table.sb-grid th, table.sb-grid td { padding: 3px; vertical-align: top; }
+table.sb-grid thead th { font-size: .85rem; padding: 6px 3px; }
+table.sb-grid .sb-timecol { width: 52px; font-size: .78rem; vertical-align: middle; line-height: 1.25; }
+.sb-t-start, .sb-t-end { display: block; white-space: nowrap; }
+.sb-t-start { font-weight: 700; }
+.sb-t-end { font-weight: 400; opacity: .7; }
+
+.sb-rowgroup { display: block; font-weight: 400; opacity: .6; font-size: .68rem; }
+
+.sb-zone { position: relative; display: flex; flex-direction: column; gap: 3px; min-height: 16px; padding: 2px; border-radius: 5px; border: 1px dashed transparent; }
+.sb-zone + .sb-zone { margin-top: 2px; }
+.sb-zone-odd { background: var(--odd-bg); }
+.sb-zone-even { background: var(--even-bg); }
+.sb-zone-odd .sb-zone-label { color: var(--odd-fg); } .sb-zone-even .sb-zone-label { color: var(--even-fg); }
+.sb-zone-label { pointer-events: none; font-size: .62rem; text-transform: uppercase; letter-spacing: .04em; opacity: .55; text-align: center; line-height: 12px; }
+.sb-zone:has(.sb-block) .sb-zone-label { text-align: left; }
+.sb-zone-all:has(.sb-block) .sb-zone-label { display: none; }
+/* Empty zones stay slim until something is being placed. */
+.sb-is-dragging .sb-zone, .sb-armed .sb-zone { min-height: 30px; border-color: var(--bd); }
+.sb-armed .sb-zone { cursor: copy; }
+.sb-zone.sb-over { border: 1px solid var(--btn); box-shadow: inset 0 0 0 2px var(--btn); }
+
+.sb-trash { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 900; padding: .8rem 1.4rem; border-radius: 999px; border: 2px dashed var(--sb-danger); background: var(--bg); color: var(--sb-danger); font-weight: 700; box-shadow: 0 4px 14px rgba(0, 0, 0, .25); }
+.sb-armed-pill { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 900; display: flex; align-items: center; gap: .6rem; max-width: calc(100vw - 32px); box-sizing: border-box; padding: .55rem .6rem .55rem 1rem; border-radius: 999px; background: var(--btn); color: var(--btnfg); font-size: .9rem; box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
+.sb-armed-pill span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-armed-pill button { border: none; border-radius: 999px; padding: .3rem .7rem; background: rgba(255, 255, 255, .22); color: inherit; font: inherit; cursor: pointer; }
+.sb-trash.sb-over { background: var(--sb-danger); color: #fff; }
+
+.sb-warnings { margin: .75rem 0; border-color: var(--sb-lab); }
+.sb-warnings summary { cursor: pointer; font-weight: 700; }
+.sb-warnings ul { margin: .5rem 0 0; padding-left: 1.2rem; font-size: .88rem; }
+.sb-warnings li { margin: .2rem 0; }
+
+.sb-danger-btn { color: var(--sb-danger) !important; border: 1px solid var(--sb-danger) !important; cursor: pointer; background: transparent !important; }
+.sb-danger-btn[disabled] { opacity: .45; cursor: default; }
+
+/* ---- modal ---------------------------------------------------------------- */
+.sb-modal { position: fixed; inset: 0; z-index: 1100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0, 0, 0, .5); overflow-y: auto; }
+.sb-modal-card { width: 100%; max-width: 440px; max-height: 100%; overflow-y: auto; box-sizing: border-box; padding: 16px; border-radius: 10px; background: var(--bg); color: var(--fg); border: 1px solid var(--bd); }
+.sb-editor h3 { margin: 0 0 .6rem; }
+.sb-editor p { margin: .4rem 0; }
+.sb-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sb-field { display: flex; flex-direction: column; gap: 3px; margin: .45rem 0; font-size: .85rem; }
+.sb-field input, .sb-field select { width: 100%; box-sizing: border-box; font-size: 1rem; }
+.sb-note { font-size: .85rem; padding: .45rem .6rem; border-radius: 6px; background: var(--odd-bg); color: var(--odd-fg); }
+.sb-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: .8rem; }
+.sb-actions .btn-nav, .sb-actions .btn-submit { margin: 0; padding: 8px 12px; font-size: .9rem; cursor: pointer; border: 1px solid var(--bd); }
+.sb-actions .btn-submit { border-color: transparent; }
+
+@media (max-width: 720px) {
+  .sb-palette { max-height: calc(var(--sb-row) * 3 - 6px + 4px); }
+  .sb-toolbar { gap: .4rem; }
+  .sb-toolbar .segmented { width: auto; }
+  .sb-spacer { display: none; }
+}
