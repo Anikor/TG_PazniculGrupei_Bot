@@ -17,4 +17,7 @@ jobs:
           for f in *.php; do php -l "$f"; done
 
       - name: JS syntax check
-        run: node --check script.js
+        run: |
+          set -e
+          node --check script.js
+          node --check schedule_builder.js

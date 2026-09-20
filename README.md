@@ -183,6 +183,24 @@ Example: `group_241_attendance_month_01.08.2025`
 
 ---
 
+## Schedule Builder (Admin)
+
+Admins get a **🗓 Schedule Builder** button on the schedule page. It replaces editing the `schedule` table by hand in phpMyAdmin.
+
+### Build
+- **Lesson blocks** (subject + type + room) are reusable templates: drag one into as many slots as you like — other days, the same day, both groups, the same room. On touch, hold a block and then drag, or tap a block and then tap a slot.
+- Every cell has three drop zones: **every week**, **odd**, **even**. A zone can hold several blocks, e.g. subgroup 1 and subgroup 2.
+- Tap a placed block to edit subject, type, room, weeks, subgroup, day and time, to **duplicate** it, or to **copy it to the other group** (shared lecture). Dragging a block onto the other group's grid also copies it.
+- **+ Time slot** adds a non-standard slot; the **Saturday** toggle adds the column.
+- Overlaps (same group/slot/week/subgroup) and room clashes between different subjects are listed as warnings; they never block saving.
+
+### Save
+- **Save schedule** writes straight to the database in one transaction. Existing lessons are updated in place, so attendance already logged against them stays linked. New lessons get the current semester number (which `export.php` filters on).
+- A lesson that already has attendance (🔒) can be moved and edited but not removed.
+
+### New semester
+- The database holds one semester at a time. **Start new semester…** deletes the whole schedule together with all attendance and its edit history for every group (students and groups are kept), after you type `NEW SEMESTER`. Last term's blocks stay in the palette. **Back up the database first.**
+
 ## Project Structure
 
 ```
@@ -199,6 +217,9 @@ Example: `group_241_attendance_month_01.08.2025`
 ├── oe_weeks.php                        # Semester/week type calculations
 ├── log_stats.php                       # Statistics logging endpoint
 ├── export.php                          # Export attendance data
+├── schedule_builder.php                # Admin-only drag & drop schedule constructor (page + JSON API)
+├── schedule_builder.js                 # Builder client: palette, grid, pointer-event drag & drop, conflicts
+├── schedule_builder.css                # Builder-only styles (reuses style.css theme tokens)
 ├── script.js                           # Frontend UI logic (minified)
 ├── style.css                           # Single stylesheet (incl. compact/big schedule layouts, scoped to the greeting page)
 └── init_db.sql                         # SQL DB Structure example

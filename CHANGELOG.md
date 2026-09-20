@@ -3,6 +3,27 @@
 All notable changes on the `rpi-restructured` / `rpi-restructured-2` branches
 (2026-07-16), newest first.
 
+## feature/schedule-builder (2026-09-20)
+
+### Added
+- **Schedule Builder** (`schedule_builder.php` + `.js` + `.css`) — admin-only
+  drag & drop constructor for the `schedule` table, replacing the per-term
+  phpMyAdmin edit → export → upload routine. Reusable lesson blocks; every /
+  odd / even drop zones per cell; subgroups; custom time slots; Saturday;
+  copy-to-other-group for shared lectures; non-blocking overlap and room
+  warnings. Pointer Events, so it works with a mouse and in Telegram's touch
+  webviews (hold-to-drag, or tap block → tap slot).
+- Save is a transactional diff: kept ids are `UPDATE`d in place so logged
+  attendance stays linked, new rows carry the computed current `semester`,
+  and removing a lesson that has attendance is refused (HTTP 409, full
+  rollback). Every field is validated server-side against the column
+  definitions in `init_db.sql`.
+- **New semester** action — typed-phrase-confirmed wipe of `attendance_log`,
+  `attendance` and `schedule` (FK order, one transaction), matching the
+  one-semester-per-database design documented in `export.php`.
+- Admin-only "🗓 Schedule Builder" link on `greeting.php`; CI now also
+  syntax-checks `schedule_builder.js`.
+
 ## rpi-restructured-2
 
 ### Fixed
