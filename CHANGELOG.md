@@ -3,6 +3,24 @@
 All notable changes on the `rpi-restructured` / `rpi-restructured-2` branches
 (2026-07-16), newest first.
 
+## De-minified sources (2026-09-20)
+
+### Changed
+- `greeting.php`, `index.php`, `edit_attendance.php`, `view_attendance.php`,
+  `view_group_attendance.php`, `time_restrict.php`, `oe_weeks.php`,
+  `script.js` and `style.css` are readable again. **Whitespace only, no
+  behaviour change**, checked mechanically: PHP token streams identical
+  (every identifier, literal, operator, comment and every byte of inline
+  HTML); `script.js` has the exact same 2,801 tokens; `style.css` is
+  byte-identical after independent minification; and 100 HTTP responses
+  (4 roles × 25 requests) from the old and new code match — 49 byte-for-byte,
+  51 differing only by newlines between `<head>` tags.
+- Style: brace on the same line, 4-space indent, short blocks kept on one
+  line (`if ($x) { return 0; }`), CSS as one rule per line
+  (`.a {margin: 0; padding: 1rem;}`). Template HTML is untouched, because
+  whitespace between inline elements renders; lines are broken after PHP
+  close tags instead, where PHP swallows the newline.
+
 ## feature/schedule-builder (2026-09-20)
 
 ### Added
