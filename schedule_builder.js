@@ -71,6 +71,8 @@
   }
   const slotStart = (s) => parseInt(s.slice(0, 2), 10) * 60 + parseInt(s.slice(3, 5), 10);
   const tplKey = (t) => [t.subject, t.type || '', t.location || ''].join('');
+  // Lowercase + strip diacritics, so typing "retele" finds "Rețele".
+  const fold = (v) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const weeksOverlap = (a, b) => !a || !b || a === b;
   const sgOverlap = (a, b) => !a || !b || a === b;
 
@@ -138,8 +140,10 @@
 
   function renderPalette() {
     const box = $('sb-palette'); box.textContent = '';
-    const items = paletteItems();
-    if (!items.length) box.append(el('span', { class: 'muted', text: 'No blocks yet — add the first subject below.' }));
+    const q = $('sb-filter').value.trim();
+    const words = fold(q).split(/\s+/).filter(Boolean);
+    const items = paletteItems().filter((t) => { const hay = fold(t.subject + ' ' + (t.type || '') + ' ' + (t.location || '')); return words.every((w) => hay.includes(w)); });
+    if (!items.length) box.append(q ? el('span', { class: 'muted', text: 'No block matches “' + q + '”.' }) : el('span', { class: 'muted', text: 'No blocks yet — add the first subject with “+ New block”.' }));
     items.forEach((t) => {
       const chip = el('div', {
         class: 'sb-chip sb-tpl' + (armed && tplKey(armed) === tplKey(t) ? ' armed' : ''),
@@ -190,7 +194,7 @@
       const tb = el('tbody');
       slots.forEach((s) => {
         const used = rows.some((r) => r.time_slot === s);
-        const th = el('th', { class: 'sb-timecol' }, el('span', { text: s.replace('-', '–') }), el('small', { class: 'sb-rowgroup', text: g.name }));
+        const th = el('th', { class: 'sb-timecol', title: s }, el('span', { class: 'sb-t-start', text: s.slice(0, 5) }), el('span', { class: 'sb-t-end', text: s.slice(6) }), el('small', { class: 'sb-rowgroup', text: g.name }));
         if (!used && !DEFAULT_SLOTS.includes(s)) {
           th.append(el('button', {
             type: 'button', class: 'sb-x', 'aria-label': 'Remove time slot', text: '×',
@@ -548,14 +552,22 @@
     const t = { subject, type: $('sb-nb-type').value || null, location: $('sb-nb-room').value.trim() || null };
     if (!paletteItems().some((p) => tplKey(p) === tplKey(t))) { prefs.palette.push(t); savePrefs(); }
     armed = t;
-    $('sb-nb-room').value = '';
+    $('sb-nb-subject').value = ''; $('sb-nb-room').value = ''; $('sb-filter').value = '';
     renderPalette();
+  });
+
+  $('sb-filter').addEventListener('input', renderPalette);
+  $('sb-nb-toggle').addEventListener('click', () => {
+    const f = $('sb-new-block'); f.hidden = !f.hidden;
+    $('sb-nb-toggle').setAttribute('aria-expanded', String(!f.hidden));
+    if (!f.hidden) $('sb-nb-subject').focus();
+    syncToolbarHeight();
   });
 
   $('sb-armed-cancel').addEventListener('click', () => { armed = null; renderPalette(); });
 
   // The sticky palette sits right below the sticky toolbar, whose height varies with wrapping.
-  const syncToolbarHeight = () => document.documentElement.style.setProperty('--sb-tb-h', document.querySelector('.sb-toolbar').offsetHeight + 'px');
+  function syncToolbarHeight() { document.documentElement.style.setProperty('--sb-tb-h', document.querySelector('.sb-toolbar').offsetHeight + 'px'); }
   window.addEventListener('resize', syncToolbarHeight);
   syncToolbarHeight();
 

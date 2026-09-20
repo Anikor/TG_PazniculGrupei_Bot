@@ -22,13 +22,21 @@
 .sb-banner.ok { background: var(--even-bg); color: var(--even-fg); border-color: var(--even-fg); }
 .sb-banner.err { background: rgba(211, 47, 47, .12); color: var(--fg); border-color: var(--sb-danger); }
 
-.sb-palette-panel { margin: .75rem 0; }
-/* Wide screens: keep the blocks reachable while the grids scroll underneath. */
-@media (min-width: 721px) and (min-height: 600px) { .sb-palette-panel { position: sticky; top: var(--sb-tb-h, 50px); z-index: 15; box-shadow: 0 4px 10px rgba(0, 0, 0, .12); } }
-.sb-palette-head { display: flex; gap: .75rem; align-items: baseline; flex-wrap: wrap; }
-.sb-hint { font-size: .85rem; }
-.sb-palette { display: flex; flex-wrap: wrap; gap: 6px; margin: .5rem 0; max-height: 7.2rem; overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
-.sb-new-block { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sb-hint { font-size: .85rem; margin: .6rem 0 0; }
+.sb-palette-panel { margin: .5rem 0 .75rem; padding: 8px 10px; }
+/* Pinned under the toolbar so blocks stay reachable while the grids scroll.
+   Kept to two chip rows: it must never take more than a sliver of a small window. */
+@media (min-width: 721px) and (min-height: 520px) { .sb-palette-panel { position: sticky; top: var(--sb-tb-h, 50px); z-index: 15; box-shadow: 0 4px 10px rgba(0, 0, 0, .12); } }
+.sb-palette-head { display: flex; gap: .5rem; align-items: center; }
+.sb-palette-head .panel-title { margin: 0; white-space: nowrap; }
+.sb-palette-head .btn-nav { margin: 0; cursor: pointer; border: 1px solid var(--bd); white-space: nowrap; font-size: .85rem; padding: 5px 10px; }
+.sb-page .sb-filter { flex: 1 1 6rem; min-width: 0; max-width: 16rem; margin-left: auto; padding: .25rem .5rem; font-size: .85rem; }
+/* --sb-row = one chip row incl. gap; max-height is a whole number of rows and
+   rows snap, so a row is never sliced in half at the scroll edge. */
+.sb-palette { --sb-row: 32px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 6px; margin-top: 8px; padding: 2px; max-height: calc(var(--sb-row) * 2 - 6px + 4px); overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; scroll-padding: 2px; }
+.sb-palette .sb-chip { scroll-snap-align: start; flex-wrap: nowrap; height: 26px; box-sizing: border-box; max-width: 100%; }
+.sb-palette .sb-subj { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-new-block { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
 .sb-new-block .btn-nav { margin: 0; cursor: pointer; border: 1px solid var(--bd); }
 #sb-nb-subject { flex: 1 1 12rem; min-width: 0; }
 
@@ -65,7 +73,10 @@
 table.sb-grid { margin: 0; min-width: 640px; table-layout: fixed !important; border-collapse: collapse; }
 table.sb-grid th, table.sb-grid td { padding: 3px; vertical-align: top; }
 table.sb-grid thead th { font-size: .85rem; padding: 6px 3px; }
-table.sb-grid .sb-timecol { width: 64px; font-size: .75rem; font-weight: 600; vertical-align: middle; white-space: nowrap; }
+table.sb-grid .sb-timecol { width: 52px; font-size: .78rem; vertical-align: middle; line-height: 1.25; }
+.sb-t-start, .sb-t-end { display: block; white-space: nowrap; }
+.sb-t-start { font-weight: 700; }
+.sb-t-end { font-weight: 400; opacity: .7; }
 
 .sb-rowgroup { display: block; font-weight: 400; opacity: .6; font-size: .68rem; }
 
@@ -111,7 +122,7 @@ table.sb-grid .sb-timecol { width: 64px; font-size: .75rem; font-weight: 600; ve
 .sb-actions .btn-submit { border-color: transparent; }
 
 @media (max-width: 720px) {
-  .sb-hint { display: block; width: 100%; }
+  .sb-palette { max-height: calc(var(--sb-row) * 3 - 6px + 4px); }
   .sb-toolbar { gap: .4rem; }
   .sb-toolbar .segmented { width: auto; }
   .sb-spacer { display: none; }

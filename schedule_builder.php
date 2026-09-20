@@ -294,18 +294,21 @@ header('Content-Type: text/html; charset=UTF-8');
 
 <div id="sb-banner" class="sb-banner" role="status" hidden></div>
 
+<p class="muted sb-hint">Drag a block into a slot (hold, then drag on touch) — or tap a block, then tap a slot. Blocks can be reused any number of times, in both groups.</p>
+
 <section class="panel sb-palette-panel">
   <div class="sb-palette-head">
     <p class="panel-title">Lesson blocks</p>
-    <span class="muted sb-hint">Drag a block into a slot (hold, then drag on touch) — or tap a block, then tap a slot. Blocks can be reused any number of times, in both groups.</span>
+    <input type="search" id="sb-filter" class="sb-filter" placeholder="Filter…" aria-label="Filter lesson blocks" autocomplete="off">
+    <button type="button" class="btn-nav" id="sb-nb-toggle" aria-expanded="false" aria-controls="sb-new-block">+ New block</button>
   </div>
-  <div id="sb-palette" class="sb-palette"></div>
-  <form id="sb-new-block" class="sb-new-block" autocomplete="off">
-    <input type="text" id="sb-nb-subject" maxlength="50" placeholder="Subject" required>
-    <select id="sb-nb-type" aria-label="Type"><option value="">no type</option><option value="curs">curs</option><option value="sem">sem</option><option value="lab">lab</option></select>
-    <input type="text" id="sb-nb-room" maxlength="20" placeholder="Room" size="6">
-    <button type="submit" class="btn-nav">+ Add block</button>
+  <form id="sb-new-block" class="sb-new-block" autocomplete="off" hidden>
+    <input type="text" id="sb-nb-subject" name="subject" maxlength="50" placeholder="Subject" required>
+    <select id="sb-nb-type" name="type" aria-label="Type"><option value="">no type</option><option value="curs">curs</option><option value="sem">sem</option><option value="lab">lab</option></select>
+    <input type="text" id="sb-nb-room" name="room" maxlength="20" placeholder="Room" size="6">
+    <button type="submit" class="btn-nav">Add</button>
   </form>
+  <div id="sb-palette" class="sb-palette"></div>
 </section>
 
 <details id="sb-warnings" class="panel sb-warnings" hidden>
