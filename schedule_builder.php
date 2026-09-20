@@ -123,8 +123,17 @@ function sb_validate_row($r, array $groupIds, int $n): array
 // ---------------------------------------------------------------------------
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     header('Content-Type: application/json; charset=UTF-8');
-    if (!str_contains($_SERVER['CONTENT_TYPE'] ?? '', 'application/json')) {
+    // This API can wipe a term of attendance, so it is stricter than the shared
+    // guards. The media type must BE application/json: a substring test also
+    // accepts "text/plain;application/json", which a hostile page can send
+    // without a CORS preflight — silently removing that layer of CSRF defence.
+    if (!preg_match('#^\s*application/json\s*(;|$)#i', $_SERVER['CONTENT_TYPE'] ?? '')) {
         sb_json(415, ['success' => false, 'error' => 'JSON only']);
+    }
+    // tg_require_same_origin() lets a missing Origin through. Every browser sends
+    // Origin on a fetch() POST, so here its absence is refused rather than trusted.
+    if (($_SERVER['HTTP_ORIGIN'] ?? '') === '') {
+        sb_json(403, ['success' => false, 'error' => 'Origin header required']);
     }
     tg_require_same_origin();
 
@@ -262,6 +271,12 @@ $boot = [
 $theme      = (($_COOKIE['theme'] ?? 'light') === 'dark') ? 'dark' : 'light';
 $themeClass = $theme === 'dark' ? 'dark-theme' : '';
 header('Content-Type: text/html; charset=UTF-8');
+// The session cookie is SameSite=None (Telegram Web embeds the miniapp in an
+// iframe), so it also rides inside a hostile site's frame. Only Telegram may
+// frame this page; the desktop/mobile apps use a webview and are unaffected.
+header("Content-Security-Policy: frame-ancestors 'self' https://*.telegram.org");
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: same-origin');
 ?><!DOCTYPE html>
 <html lang="en" class="<?= $themeClass ?>">
 <head>

@@ -21,6 +21,15 @@ All notable changes on the `rpi-restructured` / `rpi-restructured-2` branches
 - **New semester** action — typed-phrase-confirmed wipe of `attendance_log`,
   `attendance` and `schedule` (FK order, one transaction), matching the
   one-semester-per-database design documented in `export.php`.
+- **Request hardening (builder API only).** The media type must *be*
+  `application/json`; the shared substring test also accepts
+  `text/plain;application/json`, which needs no CORS preflight. A missing
+  `Origin` is refused instead of trusted. The page sends
+  `Content-Security-Policy: frame-ancestors 'self' https://*.telegram.org`
+  (the session cookie is `SameSite=None`), plus `nosniff` and a same-origin
+  referrer policy. The same substring test remains in `tg_auth.php`,
+  `index.php` and `edit_attendance.php`, where the `Origin` check is the
+  effective CSRF defence.
 - Admin-only "🗓 Schedule Builder" link on `greeting.php`; CI now also
   syntax-checks `schedule_builder.js`.
 
